@@ -221,18 +221,20 @@ static int countint (const TValue *key, int *nums) {
 
 static int numusearray (const Table *t, int *nums) {
   int lg;
-  int ttlg;  /* 2^lg */
-  int ause = 0;  /* summation of `nums' */
+  int ttlg;  /* twotolog 2^lg */
+  int ause = 0; /* 非空元素总个数 */ /* summation of `nums' */
   int i = 1;  /* count to traverse all array keys */
   for (lg=0, ttlg=1; lg<=MAXBITS; lg++, ttlg*=2) {  /* for each slice */
     int lc = 0;  /* counter */
     int lim = ttlg;
+    /* lim = min(ttlg, t->sizearray) */
     if (lim > t->sizearray) {
       lim = t->sizearray;  /* adjust upper limit */
       if (i > lim)
         break;  /* no more elements to count */
     }
     /* count elements in range (2^(lg-1), 2^lg] */
+    /* 统计区间(2^(lg-1), 2^lg]内非空元素个数, 存放在nums第lg个元素 */
     for (; i <= lim; i++) {
       if (!ttisnil(&t->array[i-1]))
         lc++;
@@ -246,7 +248,7 @@ static int numusearray (const Table *t, int *nums) {
 
 static int numusehash (const Table *t, int *nums, int *pnasize) {
   int totaluse = 0;  /* total number of elements */
-  int ause = 0;  /* summation of `nums' */
+  int ause = 0;  /* 非空元素总个数 */ /* summation of `nums' */
   int i = sizenode(t);
   while (i--) {
     Node *n = &t->node[i];
@@ -331,14 +333,16 @@ void luaH_resizearray (lua_State *L, Table *t, int nasize) {
 
 
 static void rehash (lua_State *L, Table *t, const TValue *ek) {
+  /* nasize为大于当前数组大小的最小2次幂 */
   int nasize, na;
-  int nums[MAXBITS+1];  /* nums[i] = number of keys between 2^(i-1) and 2^i */
+  int nums[MAXBITS+1];  /* 位图数组, 第i个元素保存key为(整数)(2^(i-1), 2^i]之间的元素个数 */ /* nums[i] = number of keys between 2^(i-1) and 2^i */
   int i;
   int totaluse;
+  /* `nums` 全部清零 */
   for (i=0; i<=MAXBITS; i++) nums[i] = 0;  /* reset counts */
-  nasize = numusearray(t, nums);  /* count keys in array part */
+  nasize = numusearray(t, nums); /* 统计数组部分元素个数, 更新结果至`nums` */ /* count keys in array part */
   totaluse = nasize;  /* all those keys are integer keys */
-  totaluse += numusehash(t, nums, &nasize);  /* count keys in hash part */
+  totaluse += numusehash(t, nums, &nasize);  /* 统计散列表部分元素个数, 更新结果至`nums` */ /* count keys in hash part */
   /* count extra key */
   nasize += countint(ek, nums);
   totaluse++;
@@ -400,8 +404,9 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp = mainposition(t, key);
   if (!ttisnil(gval(mp)) || mp == dummynode) {
     Node *othern;
-    Node *n = getfreepos(t);  /* get a free place */
+    Node *n = getfreepos(t);  /* 获取空闲节点 */ /* get a free place */
     if (n == NULL) {  /* cannot find a free place? */
+      /* 没有空闲节点时, 散列表需要扩容, 重新散列 */
       rehash(L, t, key);  /* grow table */
       return luaH_set(L, t, key);  /* re-insert key into grown table */
     }
@@ -432,11 +437,16 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
 /*
 ** search function for integers
 */
+/*
+** 从表`t`中读取整型键关联的值
+ */
 const TValue *luaH_getnum (Table *t, int key) {
   /* (1 <= key && key <= t->sizearray) */
+  /* 下标在数组大小范围内, 从数组部分直接读取 */
   if (cast(unsigned int, key-1) < cast(unsigned int, t->sizearray))
     return &t->array[key-1];
   else {
+    /* 否则从散列表部分读取. 如非顺序下标或下标数值过大等情况 */
     lua_Number nk = cast_num(key);
     Node *n = hashnum(t, nk);
     do {  /* check whether `key' is somewhere in the chain */
@@ -453,7 +463,9 @@ const TValue *luaH_getnum (Table *t, int key) {
 ** search function for strings
 */
 const TValue *luaH_getstr (Table *t, TString *key) {
+  /* 定位所在的bucket */
   Node *n = hashstr(t, key);
+  /* 遍历拉链 */
   do {  /* check whether `key' is somewhere in the chain */
     if (ttisstring(gkey(n)) && rawtsvalue(gkey(n)) == key)
       return gval(n);  /* that's it */
@@ -479,6 +491,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
       /* else go through */
     }
     default: {
+      /* 计算key的hash值并取得所在slot */
       Node *n = mainposition(t, key);
       do {  /* check whether `key' is somewhere in the chain */
         if (luaO_rawequalObj(key2tval(n), key))
@@ -492,14 +505,17 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 
 
 TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
+  /* 从表`t`查找键`key`关联的值对象 */
   const TValue *p = luaH_get(t, key);
   t->flags = 0;
+  /* 非空则直接返回值 */
   if (p != luaO_nilobject)
     return cast(TValue *, p);
   else {
     if (ttisnil(key)) luaG_runerror(L, "table index is nil");
     else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
       luaG_runerror(L, "table index is NaN");
+    /* 创建值对象并加入表`t` */
     return newkey(L, t, key);
   }
 }
