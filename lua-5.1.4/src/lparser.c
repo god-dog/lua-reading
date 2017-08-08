@@ -273,12 +273,18 @@ static void adjust_assign (LexState *ls, int nvars, int nexps, expdesc *e) {
 }
 
 
+/*
+** 进入语法层
+ */
 static void enterlevel (LexState *ls) {
+  /* 语法层嵌套深度超过最大限制 */
   if (++ls->L->nCcalls > LUAI_MAXCCALLS)
 	luaX_lexerror(ls, "chunk has too many syntax levels", 0);
 }
 
-
+/*
+** 离开语法层
+ */
 #define leavelevel(ls)	((ls)->L->nCcalls--)
 
 
@@ -325,6 +331,9 @@ static void pushclosure (LexState *ls, FuncState *func, expdesc *v) {
 }
 
 
+/*
+** 函数状态入栈. 进入"function"的构造操作
+ */
 static void open_func (LexState *ls, FuncState *fs) {
   lua_State *L = ls->L;
   Proto *f = luaF_newproto(L);
@@ -352,7 +361,9 @@ static void open_func (LexState *ls, FuncState *fs) {
   incr_top(L);
 }
 
-
+/*
+** 函数状态出栈. 离开"function"的析构操作
+ */
 static void close_func (LexState *ls) {
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
@@ -380,14 +391,18 @@ static void close_func (LexState *ls) {
 }
 
 
+/*
+** 语法分析主函数
+ */
 Proto *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff, const char *name) {
   struct LexState lexstate;
   struct FuncState funcstate;
   lexstate.buff = buff;
   luaX_setinput(L, &lexstate, z, luaS_new(L, name));
   open_func(&lexstate, &funcstate);
-  funcstate.f->is_vararg = VARARG_ISVARARG;  /* main func. is always vararg */
-  luaX_next(&lexstate);  /* read first token */
+  funcstate.f->is_vararg = VARARG_ISVARARG;  /* 主函数的参数总是变长参数 */ /* main func. is always vararg */
+  luaX_next(&lexstate);  /* 预读一个token */ /* read first token */
+  /* 解析程序块 */
   chunk(&lexstate);
   check(&lexstate, TK_EOS);
   close_func(&lexstate);
@@ -775,16 +790,21 @@ static void simpleexp (LexState *ls, expdesc *v) {
 }
 
 
+/*
+** 判断是否单目运算符
+ */
 static UnOpr getunopr (int op) {
   switch (op) {
     case TK_NOT: return OPR_NOT;
     case '-': return OPR_MINUS;
-    case '#': return OPR_LEN;
+    case '#': return OPR_LEN;   /* `#` 取表长度 */
     default: return OPR_NOUNOPR;
   }
 }
 
-
+/*
+** 判断是否双目运算符
+ */
 static BinOpr getbinopr (int op) {
   switch (op) {
     case '+': return OPR_ADD;
@@ -825,6 +845,9 @@ static const struct {
 ** subexpr -> (simpleexp | unop subexpr) { binop subexpr }
 ** where `binop' is any binary operator with a priority higher than `limit'
 */
+/*
+** 子表达式语法解析采用算符优先文法
+ */
 static BinOpr subexpr (LexState *ls, expdesc *v, unsigned int limit) {
   BinOpr op;
   UnOpr uop;
@@ -1226,9 +1249,9 @@ static void exprstat (LexState *ls) {
   FuncState *fs = ls->fs;
   struct LHS_assign v;
   primaryexp(ls, &v.v);
-  if (v.v.k == VCALL)  /* stat -> func */
+  if (v.v.k == VCALL)  /* 函数调用 */ /* stat -> func */
     SETARG_C(getcode(fs, &v.v), 1);  /* call statement uses no results */
-  else {  /* stat -> assignment */
+  else {  /* 表达式赋值 */ /* stat -> assignment */
     v.prev = NULL;
     assignment(ls, &v, 1);
   }
@@ -1268,36 +1291,39 @@ static void retstat (LexState *ls) {
 }
 
 
+/*
+** 解析单条语句
+ */
 static int statement (LexState *ls) {
   int line = ls->linenumber;  /* may be needed for error messages */
   switch (ls->t.token) {
-    case TK_IF: {  /* stat -> ifstat */
+    case TK_IF: {  /* if语句 */ /* stat -> ifstat */
       ifstat(ls, line);
       return 0;
     }
-    case TK_WHILE: {  /* stat -> whilestat */
+    case TK_WHILE: {  /* while语句 */ /* stat -> whilestat */
       whilestat(ls, line);
       return 0;
     }
-    case TK_DO: {  /* stat -> DO block END */
+    case TK_DO: {  /* do end 作用域 */ /* stat -> DO block END */
       luaX_next(ls);  /* skip DO */
       block(ls);
       check_match(ls, TK_END, TK_DO, line);
       return 0;
     }
-    case TK_FOR: {  /* stat -> forstat */
+    case TK_FOR: { /* for 语句 */ /* stat -> forstat */
       forstat(ls, line);
       return 0;
     }
-    case TK_REPEAT: {  /* stat -> repeatstat */
+    case TK_REPEAT: { /* repeat 语句 */ /* stat -> repeatstat */
       repeatstat(ls, line);
       return 0;
     }
-    case TK_FUNCTION: {
+    case TK_FUNCTION: /* function 语句 */ {
       funcstat(ls, line);  /* stat -> funcstat */
       return 0;
     }
-    case TK_LOCAL: {  /* stat -> localstat */
+    case TK_LOCAL: {  /* 局部变量或函数赋值 */ /* stat -> localstat */
       luaX_next(ls);  /* skip LOCAL */
       if (testnext(ls, TK_FUNCTION))  /* local function? */
         localfunc(ls);
@@ -1305,14 +1331,14 @@ static int statement (LexState *ls) {
         localstat(ls);
       return 0;
     }
-    case TK_RETURN: {  /* stat -> retstat */
+    case TK_RETURN: {  /* return 语句 */ /* stat -> retstat */
       retstat(ls);
-      return 1;  /* must be last statement */
+      return 1;  /* return 必须是当前作用域最后一条语句 */ /* must be last statement */
     }
-    case TK_BREAK: {  /* stat -> breakstat */
+    case TK_BREAK: {  /* break 语句 */ /* stat -> breakstat */
       luaX_next(ls);  /* skip BREAK */
       breakstat(ls);
-      return 1;  /* must be last statement */
+      return 1;  /* break 必须是当前作用域最后一条语句 */ /* must be last statement */
     }
     default: {
       exprstat(ls);

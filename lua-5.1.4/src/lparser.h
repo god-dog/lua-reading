@@ -15,6 +15,9 @@
 /*
 ** Expression descriptor
 */
+/*
+** 表达式描述符
+ */
 
 typedef enum {
   VVOID,	/* no value */
@@ -55,11 +58,14 @@ struct BlockCnt;  /* defined in lparser.c */
 
 
 /* state needed to generate code for a given function */
+/*
+** 每解析一个"function"即建立一个"FuncState"数据结构
+ */
 typedef struct FuncState {
   Proto *f;  /* current function header */
   Table *h;  /* table to find (and reuse) elements in `k' */
-  struct FuncState *prev;  /* enclosing function */
-  struct LexState *ls;  /* lexical state */
+  struct FuncState *prev;  /* 外层函数状态. 栈底是mainfunc的FuncState, 栈顶是当前正在分析的FuncState */ /* enclosing function */
+  struct LexState *ls;  /* 语法状态 */ /* lexical state */
   struct lua_State *L;  /* copy of the Lua state */
   struct BlockCnt *bl;  /* chain of current blocks */
   int pc;  /* next position to code (equivalent to `ncode') */
