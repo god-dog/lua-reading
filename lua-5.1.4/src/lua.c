@@ -330,10 +330,13 @@ static int handle_luainit (lua_State *L) {
 }
 
 
+/*
+** 命令行运行信息
+ */
 struct Smain {
-  int argc;
-  char **argv;
-  int status;
+  int argc;     /* 命令行参数个数 */
+  char **argv;  /* 命令行参数数组 */
+  int status;   /* 返回状态 */
 };
 
 
