@@ -19,9 +19,11 @@ struct lua_longjmp;  /* defined in ldo.c */
 
 
 /* table of globals */
+/* 全局变量表 */
 #define gt(L)	(&L->l_gt)
 
 /* registry */
+/* 注册表. C代码可以自由使用, 但Lua代码不能访问 */
 #define registry(L)	(&G(L)->l_registry)
 
 
@@ -37,21 +39,24 @@ struct lua_longjmp;  /* defined in ldo.c */
 
 typedef struct stringtable {
   GCObject **hash;
-  lu_int32 nuse;  /* number of elements */
-  int size;
+  lu_int32 nuse;  /* 元素个数 */  /* number of elements */
+  int size;       /* 桶大小 */
 } stringtable;
 
 
 /*
 ** informations about a call
 */
+/*
+** 函数调用信息
+ */
 typedef struct CallInfo {
   StkId base;  /* base for this function */
   StkId func;  /* function index in the stack */
   StkId	top;  /* top for this function */
-  const Instruction *savedpc;
-  int nresults;  /* expected number of results from this function */
-  int tailcalls;  /* number of tail calls lost under this entry */
+  const Instruction *savedpc; /* 调用中断时, 用于记录程序计数器(pc)位置信息 */
+  int nresults;  /* 返回值个数. -1 表示返回值个数不限 */ /* expected number of results from this function */
+  int tailcalls;  /* 尾递归调用次数. 调试之用 */ /* number of tail calls lost under this entry */
 } CallInfo;
 
 
@@ -65,8 +70,11 @@ typedef struct CallInfo {
 /*
 ** `global state', shared by all threads of this state
 */
+/*
+** 全局状态, 所有线程共享该状态
+ */
 typedef struct global_State {
-  stringtable strt;  /* hash table for strings */
+  stringtable strt;  /* 全局字符串表 */ /* hash table for strings */
   lua_Alloc frealloc;  /* function to reallocate memory */
   void *ud;         /* auxiliary data to `frealloc' */
   lu_byte currentwhite;
@@ -86,62 +94,71 @@ typedef struct global_State {
   int gcpause;  /* size of pause between successive GCs */
   int gcstepmul;  /* GC `granularity' */
   lua_CFunction panic;  /* to be called in unprotected errors */
-  TValue l_registry;
+  TValue l_registry;  /* `LUA_REGISTRYINDEX` 对应的全局表 */
   struct lua_State *mainthread;
   UpVal uvhead;  /* head of double-linked list of all open upvalues */
-  struct Table *mt[NUM_TAGS];  /* metatables for basic types */
-  TString *tmname[TM_N];  /* array with tag-method names */
+  struct Table *mt[NUM_TAGS];  /* 基本类型的元表 */ /* metatables for basic types */
+  TString *tmname[TM_N];  /* 元方法名数组 */ /* array with tag-method names */
 } global_State;
 
 
 /*
 ** `per thread' state
 */
+/*
+** 每个线程(协程)对应一个状态上下文. 每个线程拥有独立的数据栈, 函数调用链, 以及独立的调试钩子和错误处理方法.
+ * 几乎所有的API操作都是围绕`lua_State`进行, 因此API的第一个参数类型总是`lua_State*`.
+ * lua_State中包括两个重要的数据结构, 一个是数组表示的数据栈, 一个是链表表示的函数调用栈
+ * lua虚拟机模拟CPU, lua栈模拟内存
+ */
 struct lua_State {
   CommonHeader;
-  lu_byte status;
-  StkId top;  /* first free slot in the stack */
-  StkId base;  /* base of current function */
-  global_State *l_G;
-  CallInfo *ci;  /* call info for current function */
-  const Instruction *savedpc;  /* `savedpc' of current function */
-  StkId stack_last;  /* last free slot in the stack */
-  StkId stack;  /* stack base */
-  CallInfo *end_ci;  /* points after end of ci array*/
-  CallInfo *base_ci;  /* array of CallInfo's */
-  int stacksize;
-  int size_ci;  /* size of array `base_ci' */
-  unsigned short nCcalls;  /* number of nested C calls */
+  lu_byte status; /* 线程状态. @see LUA_YIELD: 1, LUA_ERRRUN: 2, LUA_ERRSYNTAX: 3, LUA_ERRMEM: 4, LUA_ERRERR: 5  */
+  StkId top;  /* 数据栈栈顶 */ /* first free slot in the stack */
+  StkId base; /* 当前函数运行时基址位置 */  /* base of current function */
+  global_State *l_G;  /* 全局状态指针 */
+  CallInfo *ci;  /* 当前函数调用信息 */ /* call info for current function */
+  const Instruction *savedpc; /* 当前函数程序计数器 */ /* `savedpc' of current function */
+  StkId stack_last;  /* 数据栈最后一个实际空闲位置 */ /* last free slot in the stack */
+  StkId stack;  /* 数据栈的基址 */ /* stack base */
+  CallInfo *end_ci;  /* 函数调用栈栈顶 */ /* points after end of ci array*/
+  CallInfo *base_ci;  /* 函数调用栈栈底 */ /* array of CallInfo's */
+  int stacksize;  /* 数据栈大小 */
+  int size_ci;  /* 函数调用栈大小 */ /* size of array `base_ci' */
+  unsigned short nCcalls;  /* C函数调用深度 */ /* number of nested C calls */
   unsigned short baseCcalls;  /* nested C calls when resuming coroutine */
-  lu_byte hookmask;
-  lu_byte allowhook;
-  int basehookcount;
-  int hookcount;
-  lua_Hook hook;
-  TValue l_gt;  /* table of globals */
-  TValue env;  /* temporary place for environments */
+  lu_byte hookmask; /* hook掩码. @see LUA_MASKCALL, LUA_MASKRET, LUA_MASKLINE, LUA_MASKCOUNT */
+  lu_byte allowhook; /* 是否允许hook */
+  int basehookcount; /* 掩码设置为`LUA_MASKCOUNT`时, 执行`basehookcount`条指令触发hook */
+  int hookcount;  /* 掩码设置为`LUA_MASKCOUNT`时, 运行了`hookcount`条指令 */
+  lua_Hook hook; /* 用户注册的hook回调函数. 函数指针 */
+  TValue l_gt;  /* 当前线程的全局环境表 */ /* table of globals */
+  TValue env;  /* 当前环境表 */ /* temporary place for environments */
   GCObject *openupval;  /* list of open upvalues in this stack */
   GCObject *gclist;
-  struct lua_longjmp *errorJmp;  /* current error recover point */
-  ptrdiff_t errfunc;  /* current error handling function (stack index) */
+  struct lua_longjmp *errorJmp;  /* 记录当函数发生错误时长跳转位置 */ /* current error recover point */
+  ptrdiff_t errfunc;  /* 错误处理回调函数 */ /* current error handling function (stack index) */
 };
 
-
+/* 全局变量快速访问宏定义 */
 #define G(L)	(L->l_G)
 
 
 /*
 ** Union of all collectable objects
 */
+/*
+** >=4 的数据类型会被垃圾回收. @see `iscollectable`
+ */
 union GCObject {
   GCheader gch;
-  union TString ts;
-  union Udata u;
-  union Closure cl;
-  struct Table h;
-  struct Proto p;
-  struct UpVal uv;
-  struct lua_State th;  /* thread */
+  union TString ts;     /* 字符串对象 */
+  union Udata u;        /* userdata对象 */
+  union Closure cl;     /* 闭包对象 */
+  struct Table h;       /* 表对象 */
+  struct Proto p;       /* 原型对象 */
+  struct UpVal uv;      /* UpVal对象 */
+  struct lua_State th;  /* 线程对象 */  /* thread */
 };
 
 
