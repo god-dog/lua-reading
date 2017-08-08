@@ -4,7 +4,9 @@
 ** See Copyright Notice in lua.h
 */
 
-
+/*
+** Lua库辅助函数
+ */
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -519,13 +521,20 @@ LUALIB_API void luaL_unref (lua_State *L, int t, int ref) {
 ** =======================================================
 */
 
+/*
+** 文件加载数据结构
+ */
 typedef struct LoadF {
   int extraline;
   FILE *f;
   char buff[LUAL_BUFFERSIZE];
 } LoadF;
 
-
+/*
+** 读取文件回调函数
+ * @param ud  文件加载数据结构
+ * @param size 实际读取大小
+ */
 static const char *getF (lua_State *L, void *ud, size_t *size) {
   LoadF *lf = (LoadF *)ud;
   (void)L;

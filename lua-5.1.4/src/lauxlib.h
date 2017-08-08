@@ -108,6 +108,7 @@ LUALIB_API const char *(luaL_findtable) (lua_State *L, int idx,
 
 #define luaL_typename(L,i)	lua_typename(L, lua_type(L,(i)))
 
+/* lua主函数逻辑, `luaL_loadfile`对lua代码进行词法分析, 语法分析和代码生成, `lua_pcall`通过虚拟机中执行opcode */
 #define luaL_dofile(L, fn) \
 	(luaL_loadfile(L, fn) || lua_pcall(L, 0, LUA_MULTRET, 0))
 
