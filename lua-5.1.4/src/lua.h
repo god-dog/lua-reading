@@ -24,6 +24,7 @@
 
 
 /* mark for precompiled code (`<esc>Lua') */
+/* 预编译代码标识 `<esc>Lua` */
 #define	LUA_SIGNATURE	"\033Lua"
 
 /* option for multiple returns in `lua_pcall' and `lua_call' */
@@ -40,11 +41,12 @@
 
 
 /* thread status; 0 is OK */
-#define LUA_YIELD	1
-#define LUA_ERRRUN	2
-#define LUA_ERRSYNTAX	3
-#define LUA_ERRMEM	4
-#define LUA_ERRERR	5
+/* 0: 线程运行正常 */
+#define LUA_YIELD	1     /* 线程挂起. 可以手动调用 `lua_yield` 挂起线程 */
+#define LUA_ERRRUN	2   /* 线程运行时错误 */
+#define LUA_ERRSYNTAX	3 /* 线程语法分析错误 */
+#define LUA_ERRMEM	4   /* 线程内存分配错误 */
+#define LUA_ERRERR	5   /* 其他错误 */
 
 
 typedef struct lua_State lua_State;
@@ -55,6 +57,9 @@ typedef int (*lua_CFunction) (lua_State *L);
 /*
 ** functions that read/write blocks when loading/dumping Lua chunks
 */
+/*
+** 装载/转储Lua文件块的分块读写函数原型
+ */
 typedef const char * (*lua_Reader) (lua_State *L, void *ud, size_t *sz);
 
 typedef int (*lua_Writer) (lua_State *L, const void* p, size_t sz, void* ud);
@@ -63,12 +68,22 @@ typedef int (*lua_Writer) (lua_State *L, const void* p, size_t sz, void* ud);
 /*
 ** prototype for memory-allocation functions
 */
+/*
+** 内存分配函数原型
+*/
 typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 
 
 /*
 ** basic types
 */
+/*
+** 9种基本数据类型
+** LUA_T{type}. >=4 的数据类型会被垃圾回收. @see `iscollectable`
+ * 其中userdata分为`LUA_TLIGHTUSERDATA`和`LUA_TUSERDATA`两种类型:
+ * 前一种类型为light userdata), 内存由用户分配和释放;
+ * 后一种类型为full userdata, 内存由Lua虚拟机分配和回收
+ */
 #define LUA_TNONE		(-1)
 
 #define LUA_TNIL		0
@@ -318,10 +333,10 @@ LUA_API void lua_setlevel	(lua_State *from, lua_State *to);
 /*
 ** Event masks
 */
-#define LUA_MASKCALL	(1 << LUA_HOOKCALL)
-#define LUA_MASKRET	(1 << LUA_HOOKRET)
-#define LUA_MASKLINE	(1 << LUA_HOOKLINE)
-#define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)
+#define LUA_MASKCALL	(1 << LUA_HOOKCALL)   /* 函数调用之前的勾子调用 */
+#define LUA_MASKRET	(1 << LUA_HOOKRET)      /* 函数返回之后的勾子调用 */
+#define LUA_MASKLINE	(1 << LUA_HOOKLINE)   /* 函数单行执行的勾子调用 */
+#define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)  /* 若干条指令执行之后的勾子调用 */
 
 typedef struct lua_Debug lua_Debug;  /* activation record */
 
