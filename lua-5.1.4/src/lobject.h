@@ -40,6 +40,12 @@ typedef union GCObject GCObject;
 ** Common Header for all collectable objects (in macro form, to be
 ** included in other objects)
 */
+/*
+** 所有可回收对象的公共头
+** `next` 相邻可回收对象, 串联成链表
+** `tt` 数据类型
+** `marked` 标识可回收对象的颜色值
+ * */
 #define CommonHeader	GCObject *next; lu_byte tt; lu_byte marked
 
 
@@ -57,10 +63,10 @@ typedef struct GCheader {
 ** Union of all Lua values
 */
 typedef union {
-  GCObject *gc;
-  void *p;
-  lua_Number n;
-  int b;
+  GCObject *gc; /* 可被gc的对象 */
+  void *p;      /* light userdata类型 */
+  lua_Number n; /* 数值类型 */
+  int b;        /* 布尔类型 */
 } Value;
 
 
@@ -68,7 +74,41 @@ typedef union {
 ** Tagged Values
 */
 
+/*
+**  `value`: 值对象
+**  `tt`: tagged type. 类型标记, 含义见LUA_T{type}
+ */
 #define TValuefields	Value value; int tt
+
+/*
+** 值对象基类结构体. 弱数据类型实现
+** 考虑结构体对齐, lua中任何一种数据类型至少占用16字节, 即使nil类型也会占用8个字节
+ */
+/*
+typedef struct lua_TValue {
+  union {
+    union GCObject {
+      struct GCheader {
+        GCObject *next;
+        lu_byte tt;
+        lu_byte marked
+      } gch;
+      union TString ts;
+      union Udata u;
+      union Closure cl;
+      struct Table h;
+      struct Proto p;
+      struct UpVal uv;
+      struct lua_State th;
+    } *gc;
+    void *p;
+    lua_Number n;
+    int b;
+  } value;
+
+  int tt
+} TValue;
+*/
 
 typedef struct lua_TValue {
   TValuefields;
@@ -76,6 +116,7 @@ typedef struct lua_TValue {
 
 
 /* Macros to test type */
+/* 类型检测宏 */
 #define ttisnil(o)	(ttype(o) == LUA_TNIL)
 #define ttisnumber(o)	(ttype(o) == LUA_TNUMBER)
 #define ttisstring(o)	(ttype(o) == LUA_TSTRING)
@@ -87,6 +128,7 @@ typedef struct lua_TValue {
 #define ttislightuserdata(o)	(ttype(o) == LUA_TLIGHTUSERDATA)
 
 /* Macros to access values */
+/* 取值相关宏 */
 #define ttype(o)	((o)->tt)
 #define gcvalue(o)	check_exp(iscollectable(o), (o)->value.gc)
 #define pvalue(o)	check_exp(ttislightuserdata(o), (o)->value.p)
@@ -114,6 +156,7 @@ typedef struct lua_TValue {
 
 
 /* Macros to set values */
+/* 赋值相关宏. GC部分 */
 #define setnilvalue(obj) ((obj)->tt=LUA_TNIL)
 
 #define setnvalue(obj,x) \
@@ -125,6 +168,7 @@ typedef struct lua_TValue {
 #define setbvalue(obj,x) \
   { TValue *i_o=(obj); i_o->value.b=(x); i_o->tt=LUA_TBOOLEAN; }
 
+/* 赋值相关宏. GC部分 */
 #define setsvalue(L,obj,x) \
   { TValue *i_o=(obj); \
     i_o->value.gc=cast(GCObject *, (x)); i_o->tt=LUA_TSTRING; \
@@ -157,7 +201,7 @@ typedef struct lua_TValue {
 
 
 
-
+/* 对象赋值 & 浅拷贝 */
 #define setobj(L,obj1,obj2) \
   { const TValue *o2=(obj2); TValue *o1=(obj1); \
     o1->value = o2->value; o1->tt=o2->tt; \
@@ -186,6 +230,7 @@ typedef struct lua_TValue {
 #define setttype(obj, tt) (ttype(obj) = (tt))
 
 
+/* >= 4 的数据类型会被垃圾回收*/
 #define iscollectable(o)	(ttype(o) >= LUA_TSTRING)
 
 
@@ -200,13 +245,14 @@ typedef union TString {
   L_Umaxalign dummy;  /* ensures maximum alignment for strings */
   struct {
     CommonHeader;
-    lu_byte reserved;
-    unsigned int hash;
-    size_t len;
+    lu_byte reserved; /* 是否保留字. 词法分析时便于快速判断字符串是否为保留字 @see `enum RESERVED` 和 `luaX_tokens` */
+    unsigned int hash;/* 字符串的散列值 */
+    size_t len;       /* 字符串长度 */
   } tsv;
 } TString;
 
 
+/* 获取字符串的原始地址 */
 #define getstr(ts)	cast(const char *, (ts) + 1)
 #define svalue(o)       getstr(rawtsvalue(o))
 
@@ -230,25 +276,25 @@ typedef union Udata {
 */
 typedef struct Proto {
   CommonHeader;
-  TValue *k;  /* constants used by the function */
-  Instruction *code;
-  struct Proto **p;  /* functions defined inside the function */
-  int *lineinfo;  /* map from opcodes to source lines */
-  struct LocVar *locvars;  /* information about local variables */
+  TValue *k;  /* 常量表: 函数运行期需要的所有常量, 使用常量表id进行索引 */ /* constants used by the function */
+  Instruction *code; /* 指令列表: 包含函数编译后生成的虚拟机指令 */
+  struct Proto **p;  /* Proto表：嵌套于该函数的所有子函数的Proto列表, OP_CLOSURE指令中的proto id通过proto表进行索引 */ /* functions defined inside the function */
+  int *lineinfo;  /* 指令行号信息, 调试之用 */ /* map from opcodes to source lines */
+  struct LocVar *locvars;  /* 局部变量信息: 函数中的所有局部变量名称及其生命周期. 由于所有局部变量在运行期都转化成了寄存器id, 这些信息仅供debug使用 */ /* information about local variables */
   TString **upvalues;  /* upvalue names */
-  TString  *source;
-  int sizeupvalues;
-  int sizek;  /* size of `k' */
+  TString  *source;     /* 函数信息, 调试之用 */
+  int sizeupvalues; /* `upvalues` 大小 */
+  int sizek;  /* 常量表 `k` 大小 */ /* size of `k' */
   int sizecode;
   int sizelineinfo;
-  int sizep;  /* size of `p' */
-  int sizelocvars;
-  int linedefined;
-  int lastlinedefined;
+  int sizep;  /* Proto表 `p` 大小 */ /* size of `p' */
+  int sizelocvars; /* `localvars` 数组长度*/
+  int linedefined;      /* 函数定义起始行号, 即 `function` 关键字所在的行号 */
+  int lastlinedefined;  /* 函数定义结束行号, 即 `end` 关键字所在的行号 */
   GCObject *gclist;
   lu_byte nups;  /* number of upvalues */
-  lu_byte numparams;
-  lu_byte is_vararg;
+  lu_byte numparams;  /* 参数个数 */
+  lu_byte is_vararg;  /* 参数是否为可变参数 "..." */
   lu_byte maxstacksize;
 } Proto;
 
@@ -276,7 +322,7 @@ typedef struct UpVal {
   TValue *v;  /* points to stack or to its own value */
   union {
     TValue value;  /* the value (when closed) */
-    struct {  /* double linked list (when open) */
+    struct {  /* 打开时为双链表 */ /* double linked list (when open) */
       struct UpVal *prev;
       struct UpVal *next;
     } l;
@@ -287,18 +333,28 @@ typedef struct UpVal {
 /*
 ** Closures
 */
-
+/*
+** isC 是否C函数. 0 - lua函数, 1 - c函数
+** nupvalues upvalue或upvals个数
+ * env 上下文环境
+ */
 #define ClosureHeader \
 	CommonHeader; lu_byte isC; lu_byte nupvalues; GCObject *gclist; \
 	struct Table *env
 
+/*
+** CClosure: 与外部C函数交互的闭包
+ */
 typedef struct CClosure {
   ClosureHeader;
-  lua_CFunction f;
-  TValue upvalue[1];
+  lua_CFunction f;      /* C函数原型, 实际为一个函数指针 */
+  TValue upvalue[1];    /* 函数参数 */
 } CClosure;
 
-
+/*
+** LClosure: lua内部函数的闭包, 由lua虚拟机管理
+ * Closure对象是lua运行期的一个函数实例对象, Proto则是编译期Closure的原型对象
+ */
 typedef struct LClosure {
   ClosureHeader;
   struct Proto *p;
@@ -312,7 +368,9 @@ typedef union Closure {
 } Closure;
 
 
+/* 检查是否 C API */
 #define iscfunction(o)	(ttype(o) == LUA_TFUNCTION && clvalue(o)->c.isC)
+/* 检查是否 Lua API */
 #define isLfunction(o)	(ttype(o) == LUA_TFUNCTION && !clvalue(o)->c.isC)
 
 
@@ -334,17 +392,19 @@ typedef struct Node {
   TKey i_key;
 } Node;
 
-
+/*
+** table是一个数组和散列表的混合数据结构. key为整数时数据保存在数组中; 其他类型保存在散列表中
+ */
 typedef struct Table {
   CommonHeader;
-  lu_byte flags;  /* 1<<p means tagmethod(p) is not present */ 
-  lu_byte lsizenode;  /* log2 of size of `node' array */
-  struct Table *metatable;
-  TValue *array;  /* array part */
-  Node *node;
-  Node *lastfree;  /* any free position is before this position */
+  lu_byte flags;  /* 元方法标识位. @see `TMS`. */ /* 1<<p means tagmethod(p) is not present */
+  lu_byte lsizenode;  /* 桶大小的log_2值, 即桶基于原来大小的2倍进行扩容, 其大小为2次幂. */ /* log2 of size of `node' array */
+  struct Table *metatable; /* 元表 */
+  TValue *array;  /* 数组部分首指针 */ /* array part */
+  Node *node;   /* Hash桶部分首指针 */
+  Node *lastfree;  /* Hash桶部分尾指针, 最后一个空闲位置 */ /* any free position is before this position */
   GCObject *gclist;
-  int sizearray;  /* size of `array' array */
+  int sizearray;  /* 数组部分大小 */ /* size of `array' array */
 } Table;
 
 
