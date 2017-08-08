@@ -29,6 +29,7 @@
 
 
 /* limit for table tag-method chains (to avoid loops) */
+/* 元表最大深度限制 */
 #define MAXTAGLOOP	100
 
 
@@ -112,6 +113,7 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
       const TValue *res = luaH_get(h, key); /* do a primitive get */
+      /* 返回结果为空, 读取元表的`__index` */
       if (!ttisnil(res) ||  /* result is no nil? */
           (tm = fasttm(L, h->metatable, TM_INDEX)) == NULL) { /* or no TM? */
         setobj2s(L, val, res);
@@ -382,6 +384,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
   base = L->base;
   k = cl->p->k;
   /* main loop of interpreter */
+  /* 解释器主循环 */
   for (;;) {
     const Instruction i = *pc++;
     StkId ra;
