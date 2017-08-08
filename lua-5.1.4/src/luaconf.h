@@ -4,6 +4,9 @@
 ** See Copyright Notice in lua.h
 */
 
+/*
+** Lua编译配置定义
+ */
 
 #ifndef lconfig_h
 #define lconfig_h
@@ -465,6 +468,9 @@
 @@ LUAI_MAXCCALLS is the maximum depth for nested C calls (short) and
 @* syntactical nested non-terminals in a program.
 */
+/*
+@@ LUAI_MAXCCALLS C函数调用或者非终结符语法层次嵌套最大深度
+*/
 #define LUAI_MAXCCALLS		200
 
 
@@ -472,12 +478,18 @@
 @@ LUAI_MAXVARS is the maximum number of local variables per function
 @* (must be smaller than 250).
 */
+/*
+@@ LUAI_MAXVARS 单个函数拥有的局部变量最大个数
+*/
 #define LUAI_MAXVARS		200
 
 
 /*
 @@ LUAI_MAXUPVALUES is the maximum number of upvalues per function
 @* (must be smaller than 250).
+*/
+/*
+@@ LUAI_MAXUPVALUES 单个函数拥有的最大upvalue个数
 */
 #define LUAI_MAXUPVALUES	60
 
@@ -592,6 +604,9 @@ union luai_Cast { double l_d; long l_l; };
 ** aligned in 16-byte boundaries, then you should add long double in the
 ** union.) Probably you do not need to change this.
 */
+/*
+** 确保内存与最大长度的类型对齐, 以便CPU高效存取不出错
+ */
 #define LUAI_USER_ALIGNMENT_T	union { double u; void *s; long l; }
 
 
