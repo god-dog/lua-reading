@@ -48,12 +48,15 @@ const char lua_ident[] =
 
 static TValue *index2adr (lua_State *L, int idx) {
   if (idx > 0) {
+    /* 下标 `idx` 为正时, 从栈底开始算, 地址位于 `L->base + idx - 1` */
     TValue *o = L->base + (idx - 1);
     api_check(L, idx <= L->ci->top - L->base);
+    /* 栈顶越界, 返回 `nil` */
     if (o >= L->top) return cast(TValue *, luaO_nilobject);
     else return o;
   }
   else if (idx > LUA_REGISTRYINDEX) {
+    /* 下标为负 `idx < 0 and idx > LUA_REGISTRYINDEX 时, 从栈顶开始算, 地址位于 `L->top + idx`  */
     api_check(L, idx != 0 && -idx <= L->top - L->base);
     return L->top + idx;
   }
@@ -75,9 +78,12 @@ static TValue *index2adr (lua_State *L, int idx) {
   }
 }
 
-
+/*
+** 获取当前上下文环境
+ */
 static Table *getcurrenv (lua_State *L) {
   if (L->ci == L->base_ci)  /* no enclosing function? */
+    /* 非函数环境, 则取全局环境 */
     return hvalue(gt(L));  /* use global table as environment */
   else {
     Closure *func = curr_func(L);
@@ -340,8 +346,13 @@ LUA_API int lua_toboolean (lua_State *L, int idx) {
 }
 
 
+/*
+** 将`idx`指向的对象转换为字符串, 对象必须是数字和字符串类型, 否则返回NULL.
+** `len`为`NULL`时, `len`返回字符串长度.
+ */
 LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
   StkId o = index2adr(L, idx);
+  /* 非字符串类型调用 `luaV_tostring` 转换为字符串 */
   if (!ttisstring(o)) {
     lua_lock(L);  /* `luaV_tostring' may create a new string */
     if (!luaV_tostring(L, o)) {  /* conversion failed? */
@@ -353,6 +364,7 @@ LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
     o = index2adr(L, idx);  /* previous call may reallocate the stack */
     lua_unlock(L);
   }
+  /* 直接读取字符串长度 */
   if (len != NULL) *len = tsvalue(o)->len;
   return svalue(o);
 }
