@@ -494,6 +494,7 @@ static void f_parser (lua_State *L, void *ud) {
   struct SParser *p = cast(struct SParser *, ud);
   int c = luaZ_lookahead(p->z);
   luaC_checkGC(L);
+  /* 通过数据头标识判断数据格式, 如果为二进制, 调用`luaU_undump`读取预编译的chunk; 如果为文本, 调用`luaY_parser`解析lua代码*/
   tf = ((c == LUA_SIGNATURE[0]) ? luaU_undump : luaY_parser)(L, p->z,
                                                              &p->buff, p->name);
   cl = luaF_newLclosure(L, tf->nups, hvalue(gt(L)));
