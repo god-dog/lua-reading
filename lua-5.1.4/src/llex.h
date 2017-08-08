@@ -14,6 +14,7 @@
 #define FIRST_RESERVED	257
 
 /* maximum length of a reserved word */
+/* `function` 为最长的保留字 */
 #define TOKEN_LEN	(sizeof("function")/sizeof(char))
 
 
@@ -40,6 +41,11 @@ enum RESERVED {
 LUAI_DATA const char *const luaX_tokens [];
 
 
+/*
+** 语义信息
+** 如果为TK_NUMBER类型, seminfo.r表示对应的数值;
+** 如果为TK_NAME或TK_STRING类型, seminfo.ts就表示对应的字符串
+ */
 typedef union {
   lua_Number r;
   TString *ts;
@@ -47,18 +53,21 @@ typedef union {
 
 
 typedef struct Token {
-  int token;
-  SemInfo seminfo;
+  int token;        /* 类型标识 */
+  SemInfo seminfo;  /* 语义信息 */
 } Token;
 
 
+/*
+** 词法分析状态
+ */
 typedef struct LexState {
-  int current;  /* current character (charint) */
-  int linenumber;  /* input line counter */
+  int current;  /* 当前字符 */ /* current character (charint) */
+  int linenumber;  /* 当前行号. 便于错误提示 */ /* input line counter */
   int lastline;  /* line of last token `consumed' */
   Token t;  /* current token */
   Token lookahead;  /* look ahead token */
-  struct FuncState *fs;  /* `FuncState' is private to the parser */
+  struct FuncState *fs;  /* fs指向当前正在编译的函数的 `FuncState` */ /* `FuncState' is private to the parser */
   struct lua_State *L;
   ZIO *z;  /* input stream */
   Mbuffer *buff;  /* buffer for tokens */

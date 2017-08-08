@@ -34,6 +34,7 @@
 
 
 /* ORDER RESERVED */
+/* 保留字顺序 与 */
 const char *const luaX_tokens [] = {
     "and", "break", "do", "else", "elseif",
     "end", "false", "for", "function", "if",
@@ -65,9 +66,9 @@ void luaX_init (lua_State *L) {
   int i;
   for (i=0; i<NUM_RESERVED; i++) {
     TString *ts = luaS_new(L, luaX_tokens[i]);
-    luaS_fix(ts);  /* reserved words are never collected */
+    luaS_fix(ts);  /* 保留字不会被垃圾回收 */ /* reserved words are never collected */
     lua_assert(strlen(luaX_tokens[i])+1 <= TOKEN_LEN);
-    ts->tsv.reserved = cast_byte(i+1);  /* reserved word */
+    ts->tsv.reserved = cast_byte(i+1);  /* `reserved` >= 1, 存放保留字的下标索引(类型标识), 便于快速定位; `reserved` 非零不可回收, GC过程直接忽略之 */ /* reserved word */
   }
 }
 
