@@ -431,6 +431,7 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count) {
 static void checkSizes (lua_State *L) {
   global_State *g = G(L);
   /* check size of string hash */
+  /* 元素个数小于 `strt.size/4`, 全局字符串表 `strt` 过于稀疏则精简为原大小的一半 */
   if (g->strt.nuse < cast(lu_int32, g->strt.size/4) &&
       g->strt.size > MINSTRTABSIZE*2)
     luaS_resize(L, g->strt.size/2);  /* table is too big */
