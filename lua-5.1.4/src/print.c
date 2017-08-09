@@ -4,6 +4,9 @@
 ** See Copyright Notice in lua.h
 */
 
+/*
+** 打印字节码
+ */
 #include <ctype.h>
 #include <stdio.h>
 
@@ -20,6 +23,9 @@
 #define Sizeof(x)	((int)sizeof(x))
 #define VOID(p)		((const void*)(p))
 
+/*
+** 打印字符串. 输出Lua TString类型
+ */
 static void PrintString(const TString* ts)
 {
  const char* s=getstr(ts);
@@ -48,6 +54,9 @@ static void PrintString(const TString* ts)
  putchar('"');
 }
 
+/*
+** 打印常量值
+ */
 static void PrintConstant(const Proto* f, int i)
 {
  const TValue* o=&f->k[i];
@@ -71,23 +80,41 @@ static void PrintConstant(const Proto* f, int i)
  }
 }
 
+/*
+** 打印指令列表
+ */
 static void PrintCode(const Proto* f)
 {
  const Instruction* code=f->code;
+ /* `pc`: programming counter. 程序计数器, 指令(字节码)行号 */
  int pc,n=f->sizecode;
+ /* 遍历指令列表 */
  for (pc=0; pc<n; pc++)
  {
+  /* 指令二进制值 */
   Instruction i=code[pc];
+  /* `o` 为指令名称索引  */
+  /* OpCode o=(((OpCode)(((i)>>0) & ((~((~(Instruction)0)<<6))<<0)))); */
   OpCode o=GET_OPCODE(i);
+  /* int a=(((int)(((i)>>(0 + 6)) & ((~((~(Instruction)0)<<8))<<0)))); */
   int a=GETARG_A(i);
+  /* int b=(((int)(((i)>>(((0 + 6) + 8) + 9)) & ((~((~(Instruction)0)<<9))<<0)))); */
   int b=GETARG_B(i);
+  /* int c=(((int)(((i)>>((0 + 6) + 8)) & ((~((~(Instruction)0)<<9))<<0)))); */
   int c=GETARG_C(i);
+  /* int bx=(((int)(((i)>>((0 + 6) + 8)) & ((~((~(Instruction)0)<<(9 + 9)))<<0)))); */
   int bx=GETARG_Bx(i);
+  /* int sbx=((((int)(((i)>>((0 + 6) + 8)) & ((~((~(Instruction)0)<<(9 + 9)))<<0))))-(((1<<(9 + 9))-1)>>1)); */
   int sbx=GETARG_sBx(i);
+  /* `line`为当前指令对应lua源文件行号 */
   int line=getline(f,pc);
+  /* 打印指令行号. 指令行号从1开始 */
   printf("\t%d\t",pc+1);
+  /* 打印lua源文件行号. 形式为[line] */
   if (line>0) printf("[%d]\t",line); else printf("[-]\t");
+  /* 打印操作码(指令名称) */
   printf("%-9s\t",luaP_opnames[o]);
+  /* 打印操作数 */
   switch (getOpMode(o))
   {
    case iABC:
@@ -102,6 +129,7 @@ static void PrintCode(const Proto* f)
     if (o==OP_JMP) printf("%d",sbx); else printf("%d %d",a,sbx);
     break;
   }
+  /* 打印分号之后的部分, lua源码对应的常量名, 变量名, 函数名, 包名等 */
   switch (o)
   {
    case OP_LOADK:
@@ -158,6 +186,9 @@ static void PrintCode(const Proto* f)
 #define SS(x)	(x==1)?"":"s"
 #define S(x)	x,SS(x)
 
+/*
+** 打印基本头信息, 如文件名称, 指令个数, 字节码大小, 常量个数, 局部变量个数, 函数个数等
+ */
 static void PrintHeader(const Proto* f)
 {
  const char* s=getstr(f->source);
@@ -178,6 +209,9 @@ static void PrintHeader(const Proto* f)
 	S(f->sizelocvars),S(f->sizek),S(f->sizep));
 }
 
+/*
+** 打印常量信息
+ */
 static void PrintConstants(const Proto* f)
 {
  int i,n=f->sizek;
@@ -190,6 +224,9 @@ static void PrintConstants(const Proto* f)
  }
 }
 
+/*
+** 打印局部变量信息
+ */
 static void PrintLocals(const Proto* f)
 {
  int i,n=f->sizelocvars;
@@ -201,6 +238,9 @@ static void PrintLocals(const Proto* f)
  }
 }
 
+/*
+** 打印UpValue信息
+ */
 static void PrintUpvalues(const Proto* f)
 {
  int i,n=f->sizeupvalues;
@@ -212,16 +252,21 @@ static void PrintUpvalues(const Proto* f)
  }
 }
 
+/*
+** 打印主函数信息. 顶层为`main`
+ */
 void PrintFunction(const Proto* f, int full)
 {
  int i,n=f->sizep;
  PrintHeader(f);
  PrintCode(f);
+ /* 参数为"-l -l", 完整打印, 包括常量区, 局部变量区, UpValue区信息 */
  if (full)
  {
   PrintConstants(f);
   PrintLocals(f);
   PrintUpvalues(f);
  }
+ /* 递归打印内部定义函数 */
  for (i=0; i<n; i++) PrintFunction(f->p[i],full);
 }
