@@ -23,11 +23,13 @@
 #include "lstring.h"
 #include "lundump.h"
 
-#define PROGNAME	"luac"		/* default program name */
-#define	OUTPUT		PROGNAME ".out"	/* default output file */
+#define PROGNAME	"luac"	/* default program name */
+#define	OUTPUT		PROGNAME ".out"	 /* 默认输出文件"luac.out" */ /* default output file */
 
+/* 显示指令/字节码 */
 static int listing=0;			/* list bytecodes? */
 static int dumping=1;			/* dump bytecodes? */
+/* 精简冗余的调试信息 */
 static int stripping=0;			/* strip debug information? */
 static char Output[]={ OUTPUT };	/* default output file name */
 static const char* output=Output;	/* actual output file name */
@@ -45,6 +47,9 @@ static void cannot(const char* what)
  exit(EXIT_FAILURE);
 }
 
+/*
+** 打印luac命令帮助信息. 介绍参数功能
+ */
 static void usage(const char* message)
 {
  if (*message=='-')
@@ -67,6 +72,9 @@ static void usage(const char* message)
 
 #define	IS(s)	(strcmp(argv[i],s)==0)
 
+/*
+** 命令行参数解析
+ */
 static int doargs(int argc, char* argv[])
 {
  int i;
@@ -160,21 +168,26 @@ static int pmain(lua_State* L)
  struct Smain* s = (struct Smain*)lua_touserdata(L, 1);
  int argc=s->argc;
  char** argv=s->argv;
+ /* f为编译结果 */
  const Proto* f;
  int i;
  if (!lua_checkstack(L,argc)) fatal("too many input files");
+ /* 命令行允许同时加载多个lua文件, 个数为`argc` */
  for (i=0; i<argc; i++)
  {
   const char* filename=IS("-") ? NULL : argv[i];
+  /* 逐一加载并编译lua文件 */
   if (luaL_loadfile(L,filename)!=0) fatal(lua_tostring(L,-1));
  }
  f=combine(L,argc);
  if (listing) luaU_print(f,listing>1);
  if (dumping)
  {
+  /* -o 参数为空, 默认编译结果为"luac.out" */
   FILE* D= (output==NULL) ? stdout : fopen(output,"wb");
   if (D==NULL) cannot("open");
   lua_lock(L);
+  /* 向文件写入字节码 */
   luaU_dump(L,f,writer,D,stripping);
   lua_unlock(L);
   if (ferror(D)) cannot("write");
