@@ -4,6 +4,9 @@
 ** See Copyright Notice in lua.h
 */
 
+/*
+** lua编译器和反编译器
+ */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
