@@ -25,6 +25,9 @@
 /*
 ** Extra tags for non-values
 */
+/*
+** 其他类型(非普通值类型)
+ */
 #define LUA_TPROTO	(LAST_TAG+1)
 #define LUA_TUPVAL	(LAST_TAG+2)
 #define LUA_TDEADKEY	(LAST_TAG+3)
@@ -235,7 +238,7 @@ typedef struct lua_TValue {
 
 
 
-typedef TValue *StkId;  /* index to stack elements */
+typedef TValue *StkId;  /* 栈元素引用 *//* index to stack elements */
 
 
 /*
@@ -246,25 +249,28 @@ typedef union TString {
   struct {
     CommonHeader;
     lu_byte reserved; /* 是否保留字. 词法分析时便于快速判断字符串是否为保留字 @see `enum RESERVED` 和 `luaX_tokens` */
-    unsigned int hash;/* 字符串的散列值 */
+    unsigned int hash;/* 字符串的散列值. lua 5.2 以后区分长字符串和短字符串, 为避免Hash Dos, 长字符串不再内部化 */
     size_t len;       /* 字符串长度 */
   } tsv;
 } TString;
 
 
-/* 获取字符串的原始地址 */
+/* 获取C字符串的原始指针 */
 #define getstr(ts)	cast(const char *, (ts) + 1)
 #define svalue(o)       getstr(rawtsvalue(o))
 
 
 
+/*
+ * user data 储存形式上和字符串近似, 可看成是有独立元表, 不需要内部化处理, 不以'\0'结尾的字符串
+ */
 typedef union Udata {
   L_Umaxalign dummy;  /* ensures maximum alignment for `local' udata */
   struct {
     CommonHeader;
     struct Table *metatable;
     struct Table *env;
-    size_t len;
+    size_t len;       /* 字节大小 */
   } uv;
 } Udata;
 
@@ -322,7 +328,7 @@ typedef struct UpVal {
   TValue *v;  /* points to stack or to its own value */
   union {
     TValue value;  /* the value (when closed) */
-    struct {  /* 打开时为双链表 */ /* double linked list (when open) */
+    struct {  /* 双链表指针. UpValue开放时生效, 关闭时失效 */ /* double linked list (when open) */
       struct UpVal *prev;
       struct UpVal *next;
     } l;
@@ -354,6 +360,7 @@ typedef struct CClosure {
 /*
 ** LClosure: lua内部函数的闭包, 由lua虚拟机管理
  * Closure对象是lua运行期的一个函数实例对象, Proto则是编译期Closure的原型对象
+ * 拥有upvalue的函数即为闭包, 没有upvalue的闭包是函数
  */
 typedef struct LClosure {
   ClosureHeader;

@@ -633,9 +633,14 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s) {
 /* }====================================================== */
 
 
+/*
+** 默认的内存管理函数. 统一管理内存的分配和释放
+ */
 static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
   (void)ud;
   (void)osize;
+  /* `ud`和`osize`暂时没用上. 加(void)可以避免编译警告 */
+  /* `nsize`为0时释放内存; 非0时分配内存*/
   if (nsize == 0) {
     free(ptr);
     return NULL;

@@ -43,17 +43,23 @@
 #define MINSIZEARRAY	4
 
 
+/*
+** 内存增长策略
+ */
 void *luaM_growaux_ (lua_State *L, void *block, int *size, size_t size_elems,
                      int limit, const char *errormsg) {
   void *newblock;
   int newsize;
+
+  /* 扩容到原来两倍大小. 实际大小为 max(4, min(limit / 2, *size))
+   小于MINSIZEARRAY(4 byte), 则扩大到4; 大于limit的一半, 则取limit */
   if (*size >= limit/2) {  /* cannot double it? */
     if (*size >= limit)  /* cannot grow even a little? */
       luaG_runerror(L, errormsg);
     newsize = limit;  /* still have at least one free place */
   }
   else {
-    newsize = (*size)*2;
+      newsize = (*size)*2;
     if (newsize < MINSIZEARRAY)
       newsize = MINSIZEARRAY;  /* minimum size */
   }
@@ -73,9 +79,16 @@ void *luaM_toobig (lua_State *L) {
 /*
 ** generic allocation routine.
 */
+/*
+ ** 通用内存管理函数. @see l_alloc
+ ** @param block 内存块首指针
+ ** @param osize old size
+ ** @param nsize new size
+ */
 void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
   global_State *g = G(L);
   lua_assert((osize == 0) == (block == NULL));
+  /* *g->frealloc == l_alloc */
   block = (*g->frealloc)(g->ud, block, osize, nsize);
   if (block == NULL && nsize > 0)
     luaD_throw(L, LUA_ERRMEM);

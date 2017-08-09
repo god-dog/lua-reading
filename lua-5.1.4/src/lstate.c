@@ -32,6 +32,9 @@
 /*
 ** Main thread combines a thread state and the global state
 */
+/*
+** 主线程包括线程状态和全局状态
+ */
 typedef struct LG {
   lua_State l;
   global_State g;

@@ -70,6 +70,7 @@
 
 
 
+/* 空表 */
 #define dummynode		(&dummynode_)
 
 static const Node dummynode_ = {
@@ -158,17 +159,19 @@ static int findindex (lua_State *L, Table *t, StkId key) {
   }
 }
 
-
+/*
+** 表迭代方法, 一般用于表遍历. 根据上个键访问下个键值对
+ */
 int luaH_next (lua_State *L, Table *t, StkId key) {
   int i = findindex(L, t, key);  /* find original element */
-  for (i++; i < t->sizearray; i++) {  /* try first array part */
+  for (i++; i < t->sizearray; i++) { /* 取得数据部分第一个非空值 */ /* try first array part */
     if (!ttisnil(&t->array[i])) {  /* a non-nil value? */
       setnvalue(key, cast_num(i+1));
       setobj2s(L, key+1, &t->array[i]);
       return 1;
     }
   }
-  for (i -= t->sizearray; i < sizenode(t); i++) {  /* then hash part */
+  for (i -= t->sizearray; i < sizenode(t); i++) { /* 取得散列表部分第一个非空值 */ /* then hash part */
     if (!ttisnil(gval(gnode(t, i)))) {  /* a non-nil value? */
       setobj2s(L, key, key2tval(gnode(t, i)));
       setobj2s(L, key+1, gval(gnode(t, i)));
@@ -296,6 +299,9 @@ static void setnodevector (lua_State *L, Table *t, int size) {
 }
 
 
+/*
+** 按新的大小重新调整数组部分和散列表部分的元素, 将不能放在数组里的键值对加入散列表
+ */
 static void resize (lua_State *L, Table *t, int nasize, int nhsize) {
   int i;
   int oldasize = t->sizearray;
@@ -347,6 +353,7 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
   nasize += countint(ek, nums);
   totaluse++;
   /* compute new size for array part */
+  /* 计算数组部分确保50%以上利用率所需的空间大小 */
   na = computesizes(nums, &nasize);
   /* resize the table to new computed sizes */
   resize(L, t, nasize, totaluse - na);
@@ -359,23 +366,31 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
 */
 
 
+/*
+** 创建表
+ */
 Table *luaH_new (lua_State *L, int narray, int nhash) {
   Table *t = luaM_new(L, Table);
   luaC_link(L, obj2gco(t), LUA_TTABLE);
   t->metatable = NULL;
-  t->flags = cast_byte(~0);
+  t->flags = cast_byte(~0); /* 全1 */
   /* temporary values (kept only if some malloc fails) */
+  /* 初始化数组部分和散列表部分 */
   t->array = NULL;
   t->sizearray = 0;
   t->lsizenode = 0;
-  t->node = cast(Node *, dummynode);
+  t->node = cast(Node *, dummynode); /* 指向空节点 */
   setarrayvector(L, t, narray);
   setnodevector(L, t, nhash);
   return t;
 }
 
 
+/*
+** 销毁表
+ */
 void luaH_free (lua_State *L, Table *t) {
+  /* 销毁数组部分和散列表部分 */
   if (t->node != dummynode)
     luaM_freearray(L, t->node, sizenode(t), Node);
   luaM_freearray(L, t->array, t->sizearray, TValue);
@@ -400,6 +415,16 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main 
 ** position), new key goes to an empty position. 
 */
+/*
+** 散列表部分冲突解决策略采用闭散列法(closed hashing), 也称为开放定址方法(open addressing)
+ * 闭散列法使数据分布更为紧凑, 空间利用率更高
+插入一个元素的步骤如下:
+1. 找到一个空闲节点
+2. 计算待插入元素hash值，定位目标节点.
+  2.1 若该节点空闲, 待插入元素直接存储在该节点
+  2.2 若该节点已占用, 冲突元素hash值能定位到该节点，则将待插入元素保存到空闲节点, 链接到冲突元素节点. hash冲突的元素可以通过链表遍历
+  2.3 若该节点被占用, 冲突元素hash值不能定位到该节点，则将冲突元素转移到空闲节点, 让出占用节点给待插入元素
+ */
 static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp = mainposition(t, key);
   if (!ttisnil(gval(mp)) || mp == dummynode) {
@@ -410,7 +435,7 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
       rehash(L, t, key);  /* grow table */
       return luaH_set(L, t, key);  /* re-insert key into grown table */
     }
-    lua_assert(n != dummynode);
+    lua_assert(n != dummynode); /* 节点非空 */
     othern = mainposition(t, key2tval(mp));
     if (othern != mp) {  /* is colliding node out of its main position? */
       /* yes; move colliding node into free position */
@@ -438,7 +463,7 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
 ** search function for integers
 */
 /*
-** 从表`t`中读取整型键关联的值
+** 从表`t`中读取键类型为整数时关联的值
  */
 const TValue *luaH_getnum (Table *t, int key) {
   /* (1 <= key && key <= t->sizearray) */
@@ -462,6 +487,9 @@ const TValue *luaH_getnum (Table *t, int key) {
 /*
 ** search function for strings
 */
+/*
+** 从表`t`中读取键类型为字符串时关联的值
+ */
 const TValue *luaH_getstr (Table *t, TString *key) {
   /* 定位所在的bucket */
   Node *n = hashstr(t, key);
@@ -478,6 +506,9 @@ const TValue *luaH_getstr (Table *t, TString *key) {
 /*
 ** main search function
 */
+/*
+** 读表主方法
+ */
 const TValue *luaH_get (Table *t, const TValue *key) {
   switch (ttype(key)) {
     case LUA_TNIL: return luaO_nilobject;
@@ -503,7 +534,9 @@ const TValue *luaH_get (Table *t, const TValue *key) {
   }
 }
 
-
+/*
+** 写表主方法
+ */
 TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
   /* 从表`t`查找键`key`关联的值对象 */
   const TValue *p = luaH_get(t, key);

@@ -138,6 +138,9 @@ static void correctstack (lua_State *L, TValue *oldstack) {
 }
 
 
+/*
+** 数据栈空间扩展
+ */
 void luaD_reallocstack (lua_State *L, int newsize) {
   TValue *oldstack = L->stack;
   int realsize = newsize + 1 + EXTRA_STACK;

@@ -70,6 +70,10 @@ typedef int (*lua_Writer) (lua_State *L, const void* p, size_t sz, void* ud);
 */
 /*
 ** 内存分配函数原型
+** @param ud 工作在不同的堆上时传入, 可避免线程安全问题
+** @param ptr 内存块指针
+** @param osize 内存块原大小. `ptr`为NULL, osize表示对象类型
+** @param nsize 内存块新大小
 */
 typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 

@@ -21,12 +21,18 @@
 		luaM_realloc_(L, (b), (on)*(e), (n)*(e)) : \
 		luaM_toobig(L))
 
+/* 将内存块`b`释放`s`字节空间 */
 #define luaM_freemem(L, b, s)	luaM_realloc_(L, (b), (s), 0)
+/* 释放内存块`b`*/
 #define luaM_free(L, b)		luaM_realloc_(L, (b), sizeof(*(b)), 0)
+/* 释放n个`t`类型(大小为`size(t)`)元素的数组`b` */
 #define luaM_freearray(L, b, n, t)   luaM_reallocv(L, (b), n, 0, sizeof(t))
 
+/* 分配大小为`t`字节的内存 */
 #define luaM_malloc(L,t)	luaM_realloc_(L, NULL, 0, (t))
+/* 为`t`类型变量分配内存 */
 #define luaM_new(L,t)		cast(t *, luaM_malloc(L, sizeof(t)))
+/* 为`n`个`t`类型变量分配连续内存 */
 #define luaM_newvector(L,n,t) \
 		cast(t *, luaM_reallocv(L, NULL, 0, n, sizeof(t)))
 

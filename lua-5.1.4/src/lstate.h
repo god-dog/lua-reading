@@ -3,6 +3,9 @@
 ** Global State
 ** See Copyright Notice in lua.h
 */
+/*
+** 全局状态
+ */
 
 #ifndef lstate_h
 #define lstate_h
@@ -71,7 +74,7 @@ typedef struct CallInfo {
 ** `global state', shared by all threads of this state
 */
 /*
-** 全局状态, 所有线程共享该状态
+** 全局状态, 所有执行线程共享该状态
  */
 typedef struct global_State {
   stringtable strt;  /* 全局字符串表 */ /* hash table for strings */
@@ -106,7 +109,8 @@ typedef struct global_State {
 ** `per thread' state
 */
 /*
-** 每个线程(协程)对应一个状态上下文. 每个线程拥有独立的数据栈, 函数调用链, 以及独立的调试钩子和错误处理方法.
+** 每个线程(协程)对应一个状态上下文. 每个线程拥有独立的数据栈, 函数调用链, 调试钩子和错误处理方法.
+ * `lua_State`不是一个静态数据结构, 而是lua程序的执行状态机.
  * 几乎所有的API操作都是围绕`lua_State`进行, 因此API的第一个参数类型总是`lua_State*`.
  * lua_State中包括两个重要的数据结构, 一个是数组表示的数据栈, 一个是链表表示的函数调用栈
  * lua虚拟机模拟CPU, lua栈模拟内存
@@ -140,7 +144,7 @@ struct lua_State {
   ptrdiff_t errfunc;  /* 错误处理回调函数 */ /* current error handling function (stack index) */
 };
 
-/* 全局变量快速访问宏定义 */
+/* 全局状态快速访问宏 */
 #define G(L)	(L->l_G)
 
 
@@ -176,6 +180,7 @@ union GCObject {
 #define gco2th(o)	check_exp((o)->gch.tt == LUA_TTHREAD, &((o)->th))
 
 /* macro to convert any Lua object into a GCObject */
+/* lua对象转换为gc对象宏 */
 #define obj2gco(v)	(cast(GCObject *, (v)))
 
 

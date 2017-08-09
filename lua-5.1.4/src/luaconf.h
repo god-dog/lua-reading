@@ -377,6 +377,9 @@
 ** a bit, but may be quite useful when debugging C code that interfaces
 ** with Lua. A useful redefinition is to use assert.h.
 */
+/*
+** 打开LUA_USE_APICHECK会检查API参数有效性, 虽然会拖慢解释器效率, 但是调试C接口时非常方便
+ */
 #if defined(LUA_USE_APICHECK)
 #include <assert.h>
 #define luai_apicheck(L,o)	{ (void)L; assert(o); }

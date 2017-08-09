@@ -150,6 +150,9 @@ static void DumpHeader(DumpState* D)
 /*
 ** dump Lua function as precompiled chunk
 */
+/*
+** 将程序预编译结果写入文件
+ */
 int luaU_dump (lua_State* L, const Proto* f, lua_Writer w, void* data, int strip)
 {
  DumpState D;
@@ -158,7 +161,9 @@ int luaU_dump (lua_State* L, const Proto* f, lua_Writer w, void* data, int strip
  D.data=data;
  D.strip=strip;
  D.status=0;
+ /* 写入文件头 */
  DumpHeader(&D);
+ /* 写入文件主体 */
  DumpFunction(f,NULL,&D);
  return D.status;
 }

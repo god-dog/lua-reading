@@ -10,9 +10,13 @@
 #include "lobject.h"
 
 
+/* 获取表`t`第`i`个节点 */
 #define gnode(t,i)	(&(t)->node[i])
+/* 获取节点`n`的键 */
 #define gkey(n)		(&(n)->i_key.nk)
+/* 获取节点`n`的值 */
 #define gval(n)		(&(n)->i_val)
+/* 获取节点`n`的下一个节点 */
 #define gnext(n)	((n)->i_key.nk.next)
 
 #define key2tval(n)	(&(n)->i_key.tvk)

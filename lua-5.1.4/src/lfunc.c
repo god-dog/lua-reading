@@ -138,6 +138,9 @@ Proto *luaF_newproto (lua_State *L) {
 }
 
 
+/*
+** 释放原型对象
+ */
 void luaF_freeproto (lua_State *L, Proto *f) {
   luaM_freearray(L, f->code, f->sizecode, Instruction);
   luaM_freearray(L, f->p, f->sizep, Proto *);

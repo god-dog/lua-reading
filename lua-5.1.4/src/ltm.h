@@ -15,6 +15,9 @@
 * WARNING: if you change the order of this enumeration,
 * grep "ORDER TM"
 */
+/*
+** 元方法索引
+ */
 typedef enum {
   TM_INDEX,
   TM_NEWINDEX,

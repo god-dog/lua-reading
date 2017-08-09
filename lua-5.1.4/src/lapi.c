@@ -785,6 +785,29 @@ LUA_API int lua_setfenv (lua_State *L, int idx) {
      api_check(L, (nr) == LUA_MULTRET || (L->ci->top - L->top >= (nr) - (na)))
 	
 
+/*
+** 函数调用接口
+ *
+ * 调用步骤: 函数先入栈, 随后参数正序入栈(第一个参数先入栈), 最后调用`lua_call`;
+ * 调用之后, 所有参数和函数本身会自动出栈. 所有返回值正序入栈(第一个返回值首先入栈)
+ * @param nargs 参数个数
+ * @param nresults 返回值个数
+ */
+/*
+  lua代码
+a = f("how", t.x, 14)
+  等价于
+```
+lua_getfield(L, LUA_GLOBALSINDEX, "f");
+lua_pushstring(L, "how");
+lua_getfield(L, LUA_GLOBALSINDEX, "t");
+lua_getfield(L, -1, "x");
+lua_remove(L, -2);
+lua_pushinteger(L, 14);
+lua_call(L, 3, 1);
+lua_setfield(L, LUA_GLOBALSINDEX, "a");
+ ```
+*/
 LUA_API void lua_call (lua_State *L, int nargs, int nresults) {
   StkId func;
   lua_lock(L);
