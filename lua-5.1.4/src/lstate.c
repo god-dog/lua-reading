@@ -119,6 +119,9 @@ static void close_state (lua_State *L) {
 }
 
 
+/*
+** 创建一个新线程
+ */
 lua_State *luaE_newthread (lua_State *L) {
   lua_State *L1 = tostate(luaM_malloc(L, state_size(lua_State)));
   luaC_link(L, obj2gco(L1), LUA_TTHREAD);
@@ -199,6 +202,9 @@ static void callallgcTM (lua_State *L, void *ud) {
 }
 
 
+/*
+** 销毁Lua状态机, 释放其中所涉及的动态内存, 如有`__gc`元方法会自动触发.
+ */
 LUA_API void lua_close (lua_State *L) {
   L = G(L)->mainthread;  /* only the main thread can be closed */
   lua_lock(L);

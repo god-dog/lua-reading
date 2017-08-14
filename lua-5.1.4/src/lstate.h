@@ -51,11 +51,11 @@ typedef struct stringtable {
 ** informations about a call
 */
 /*
-** 函数调用信息
+** 函数调用运行时信息
  */
 typedef struct CallInfo {
   StkId base;  /* base for this function */
-  StkId func;  /* function index in the stack */
+  StkId func;  /* 指向数据栈上当前函数的位置 *//* function index in the stack */
   StkId	top;  /* top for this function */
   const Instruction *savedpc; /* 调用中断时, 用于记录程序计数器(pc)位置信息 */
   int nresults;  /* 返回值个数. -1 表示返回值个数不限 */ /* expected number of results from this function */
@@ -78,10 +78,10 @@ typedef struct CallInfo {
  */
 typedef struct global_State {
   stringtable strt;  /* 全局字符串表 */ /* hash table for strings */
-  lua_Alloc frealloc;  /* function to reallocate memory */
-  void *ud;         /* auxiliary data to `frealloc' */
+  lua_Alloc frealloc; /* 内存管理(分配/释放)函数指针. 可分别通过`lua_getallocf`和`lua_setallocf`访问和设置 */ /* function to reallocate memory */
+  void *ud;         /* `frealloc`函数关联的参数 *//* auxiliary data to `frealloc' */
   lu_byte currentwhite;
-  lu_byte gcstate;  /* state of garbage collector */
+  lu_byte gcstate;  /* 垃圾回收状态信息 */ /* state of garbage collector */
   int sweepstrgc;  /* position of sweep in `strt' */
   GCObject *rootgc;  /* list of all collectable objects */
   GCObject **sweepgc;  /* position of sweep in `rootgc' */
@@ -96,10 +96,10 @@ typedef struct global_State {
   lu_mem gcdept;  /* how much GC is `behind schedule' */
   int gcpause;  /* size of pause between successive GCs */
   int gcstepmul;  /* GC `granularity' */
-  lua_CFunction panic;  /* to be called in unprotected errors */
-  TValue l_registry;  /* `LUA_REGISTRYINDEX` 对应的全局表 */
+  lua_CFunction panic;  /* 无保护模式函数调用时会触发该函数, 默认为null, 可以通过`lua_atpanic`配置 */ /* to be called in unprotected errors */
+  TValue l_registry;  /* `LUA_REGISTRYINDEX` 对应的全局表, 全局唯一 */
   struct lua_State *mainthread;
-  UpVal uvhead;  /* head of double-linked list of all open upvalues */
+  UpVal uvhead;  /* upvalue链表, 双链表数据结构 */ /* head of double-linked list of all open upvalues */
   struct Table *mt[NUM_TAGS];  /* 基本类型的元表 */ /* metatables for basic types */
   TString *tmname[TM_N];  /* 元方法名数组 */ /* array with tag-method names */
 } global_State;
@@ -109,7 +109,7 @@ typedef struct global_State {
 ** `per thread' state
 */
 /*
-** 每个线程(协程)对应一个状态上下文. 每个线程拥有独立的数据栈, 函数调用链, 调试钩子和错误处理方法.
+** 每个线程(协程)对应一个状态机. 每个线程拥有独立的数据栈, 函数调用链, 调试钩子和错误处理方法.
  * `lua_State`不是一个静态数据结构, 而是lua程序的执行状态机.
  * 几乎所有的API操作都是围绕`lua_State`进行, 因此API的第一个参数类型总是`lua_State*`.
  * lua_State中包括两个重要的数据结构, 一个是数组表示的数据栈, 一个是链表表示的函数调用栈
@@ -118,13 +118,13 @@ typedef struct global_State {
 struct lua_State {
   CommonHeader;
   lu_byte status; /* 线程状态. @see LUA_YIELD: 1, LUA_ERRRUN: 2, LUA_ERRSYNTAX: 3, LUA_ERRMEM: 4, LUA_ERRERR: 5  */
-  StkId top;  /* 数据栈栈顶 */ /* first free slot in the stack */
-  StkId base; /* 当前函数运行时基址位置 */  /* base of current function */
+  StkId top;  /* 数据栈栈顶, 第一个可用的空闲位置 */ /* first free slot in the stack */
+  StkId base; /* 当前函数数据栈基址, 会随函数调用发生变化 */  /* base of current function */
   global_State *l_G;  /* 全局状态指针 */
   CallInfo *ci;  /* 当前函数调用信息 */ /* call info for current function */
   const Instruction *savedpc; /* 当前函数程序计数器 */ /* `savedpc' of current function */
   StkId stack_last;  /* 数据栈最后一个实际空闲位置 */ /* last free slot in the stack */
-  StkId stack;  /* 数据栈的基址 */ /* stack base */
+  StkId stack;  /* 数据栈的基址, 初始位置 */ /* stack base */
   CallInfo *end_ci;  /* 函数调用栈栈顶 */ /* points after end of ci array*/
   CallInfo *base_ci;  /* 函数调用栈栈底 */ /* array of CallInfo's */
   int stacksize;  /* 数据栈大小 */
@@ -140,7 +140,7 @@ struct lua_State {
   TValue env;  /* 当前环境表 */ /* temporary place for environments */
   GCObject *openupval;  /* list of open upvalues in this stack */
   GCObject *gclist;
-  struct lua_longjmp *errorJmp;  /* 记录当函数发生错误时长跳转位置 */ /* current error recover point */
+  struct lua_longjmp *errorJmp;  /* 记录当函数发生错误时longjmp返回点的链表 */ /* current error recover point */
   ptrdiff_t errfunc;  /* 错误处理回调函数 */ /* current error handling function (stack index) */
 };
 
