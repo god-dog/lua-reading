@@ -205,13 +205,18 @@ void luaK_checkstack (FuncState *fs, int n) {
   }
 }
 
-
+/*
+** 预留n个寄存器. `freereg += n'
+ */
 void luaK_reserveregs (FuncState *fs, int n) {
   luaK_checkstack(fs, n);
   fs->freereg += n;
 }
 
 
+/*
+** 释放一个寄存器. `freereg -= 1`
+ */
 static void freereg (FuncState *fs, int reg) {
   if (!ISK(reg) && reg >= fs->nactvar) {
     fs->freereg--;
@@ -302,6 +307,7 @@ void luaK_setoneret (FuncState *fs, expdesc *e) {
 
 
 void luaK_dischargevars (FuncState *fs, expdesc *e) {
+  /* 根据`e->k`的表达式类型,构建出对应的opcode放在`e->u.s.info`中 */
   switch (e->k) {
     case VLOCAL: {
       e->k = VNONRELOC;
@@ -340,6 +346,9 @@ static int code_label (FuncState *fs, int A, int b, int jump) {
 }
 
 
+/*
+** 将每种表达式类型对应的Opcode写到预留的栈
+ */
 static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
   luaK_dischargevars(fs, e);
   switch (e->k) {
