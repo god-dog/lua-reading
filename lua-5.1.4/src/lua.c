@@ -244,10 +244,11 @@ static int handle_script (lua_State *L, char **argv, int n) {
   fname = argv[n];
   if (strcmp(fname, "-") == 0 && strcmp(argv[n-1], "--") != 0) 
     fname = NULL;  /* stdin */
+  /* 对脚本进行词法分析, 语法分析, 代码生成 */
   status = luaL_loadfile(L, fname);
   lua_insert(L, -(narg+1));
   if (status == 0)
-    status = docall(L, narg, 0);
+    status = docall(L, narg, 0); /* 执行生成的虚拟机指令 */
   else
     lua_pop(L, narg);      
   return report(L, status);
