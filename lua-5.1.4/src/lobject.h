@@ -325,6 +325,7 @@ typedef struct LocVar {
 
 typedef struct UpVal {
   CommonHeader;
+  /* 闭包打开时指向父函数栈上变量的引用; 闭包关闭时，v会指向本地的u.value */
   TValue *v;  /* points to stack or to its own value */
   union {
     TValue value;  /* the value (when closed) */
