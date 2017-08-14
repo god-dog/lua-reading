@@ -368,6 +368,8 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
 
 /*
 ** 创建表
+** @param narray 数组部分大小
+** @param nhash 散列表部分大小
  */
 Table *luaH_new (lua_State *L, int narray, int nhash) {
   Table *t = luaM_new(L, Table);
@@ -416,14 +418,16 @@ static Node *getfreepos (Table *t) {
 ** position), new key goes to an empty position. 
 */
 /*
-** 散列表部分冲突解决策略采用闭散列法(closed hashing), 也称为开放定址方法(open addressing)
- * 闭散列法使数据分布更为紧凑, 空间利用率更高
+散列表部分冲突解决策略采用闭散列法(closed hashing), 也称为开放定址方法(open addressing).
+闭散列法使数据分布更为紧凑, 空间利用率更高.
 插入一个元素的步骤如下:
 1. 找到一个空闲节点
 2. 计算待插入元素hash值，定位目标节点.
   2.1 若该节点空闲, 待插入元素直接存储在该节点
   2.2 若该节点已占用, 冲突元素hash值能定位到该节点，则将待插入元素保存到空闲节点, 链接到冲突元素节点. hash冲突的元素可以通过链表遍历
   2.3 若该节点被占用, 冲突元素hash值不能定位到该节点，则将冲突元素转移到空闲节点, 让出占用节点给待插入元素
+
+如果一个元素不在其主位置上, 则冲突元素就会在这个主位置上. 只有在两个元素拥有同样的主位置时才会出现冲突. 由于不存在次级冲突, 负载因子可以达到100%而没有任何性能损失
  */
 static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp = mainposition(t, key);
