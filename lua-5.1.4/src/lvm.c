@@ -3,7 +3,13 @@
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
-
+/*
+** lua虚拟机.
+** 两个优点: 堆栈式虚拟机时栈拷贝数据会产生大量的出栈入栈(push/pop)指令, 寄存器式虚拟机消除了用昂贵的值拷贝操作, 又减少了每个函数生成的指令数.
+** 两个难题: 指令大小和译码速度. 寄存器式虚拟机的指令需要指明操作数位置, 因此通常要比堆栈式虚拟机同类指令长
+** (例如, 寄存器式虚拟机的指令长度是4字节, 而其他许多典型的堆栈式虚拟机的指令长度只有1~2字节,).
+ * 不过寄存器式虚拟机生成的操作码要比堆栈式虚拟机少, 因此指令总长度大不了多少
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -250,6 +256,9 @@ static int lessequal (lua_State *L, const TValue *l, const TValue *r) {
 }
 
 
+/*
+** 比较两个弱类型对象值是否相等
+ */
 int luaV_equalval (lua_State *L, const TValue *t1, const TValue *t2) {
   const TValue *tm;
   lua_assert(ttype(t1) == ttype(t2));
@@ -342,6 +351,7 @@ static void Arith (lua_State *L, StkId ra, const TValue *rb,
 
 #define runtime_check(L, c)	{ if (!(c)) break; }
 
+/* 从指令i中取出A部分, 与当前函数基址`base`相加 */
 #define RA(i)	(base+GETARG_A(i))
 /* to be used after possible stack reallocation */
 #define RB(i)	check_exp(getBMode(GET_OPCODE(i)) == OpArgR, base+GETARG_B(i))
@@ -372,6 +382,9 @@ static void Arith (lua_State *L, StkId ra, const TValue *rb,
 
 
 
+/*
+** 虚拟机执行指令主方法
+ */
 void luaV_execute (lua_State *L, int nexeccalls) {
   LClosure *cl;
   StkId base;
