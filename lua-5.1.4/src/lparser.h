@@ -15,8 +15,9 @@
 /*
 ** Expression descriptor
 */
+
 /*
-** 表达式描述符
+** 表达式类型描述符
  */
 
 typedef enum {
@@ -38,7 +39,7 @@ typedef enum {
 } expkind;
 
 typedef struct expdesc {
-  expkind k;
+  expkind k;  /* 表达式类型 */
   union {
     struct { int info, aux; } s;
     lua_Number nval;
@@ -71,7 +72,7 @@ typedef struct FuncState {
   int pc;  /* next position to code (equivalent to `ncode') */
   int lasttarget;   /* `pc' of last `jump target' */
   int jpc;  /* list of pending jumps to `pc' */
-  int freereg;  /* first free register */
+  int freereg;  /* 记录当前栈中可用的数据位置, 每分配一个位置, 都会将freereg加一, 反之则减一 */ /* first free register */
   int nk;  /* number of elements in `k' */
   int np;  /* number of elements in `p' */
   short nlocvars;  /* number of elements in `locvars' */
