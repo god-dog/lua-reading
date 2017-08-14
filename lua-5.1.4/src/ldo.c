@@ -108,15 +108,19 @@ void luaD_throw (lua_State *L, int errcode) {
 }
 
 
+/*
+** try...catch, 不受保护模式函数调用
+ */
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
+  /* 设置long jump 返回点 */
   struct lua_longjmp lj;
   lj.status = 0;
-  lj.previous = L->errorJmp;  /* chain new error handler */
+  lj.previous = L->errorJmp;  /* 加入新错误处理器 */ /* chain new error handler */
   L->errorJmp = &lj;
   LUAI_TRY(L, &lj,
-    (*f)(L, ud);
+    (*f)(L, ud);  /* 执行函数 */
   );
-  L->errorJmp = lj.previous;  /* restore old error handler */
+  L->errorJmp = lj.previous;  /* 恢复旧错误处理器 *//* restore old error handler */
   return lj.status;
 }
 
@@ -264,6 +268,9 @@ static StkId tryfuncTM (lua_State *L, StkId func) {
    (condhardstacktests(luaD_reallocCI(L, L->size_ci)), ++L->ci))
 
 
+/*
+** 执行函数调用部分. 函数调用 = luaD_precall + luaD_poscall
+ */
 int luaD_precall (lua_State *L, StkId func, int nresults) {
   LClosure *cl;
   ptrdiff_t funcr;
@@ -272,12 +279,13 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
   funcr = savestack(L, func);
   cl = &clvalue(func)->l;
   L->ci->savedpc = L->savedpc;
-  if (!cl->isC) {  /* Lua function? prepare its call */
+  if (!cl->isC) {  /* 是lua函数? *//* Lua function? prepare its call */
     CallInfo *ci;
     StkId st, base;
     Proto *p = cl->p;
     luaD_checkstack(L, p->maxstacksize);
     func = restorestack(L, funcr);
+    /* 根据函数参数类型, 计算得CallInfo的base指针位置 */
     if (!p->is_vararg) {  /* no varargs? */
       base = func + 1;
       if (L->top > base + p->numparams)
@@ -288,6 +296,7 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
       base = adjust_varargs(L, p, nargs);
       func = restorestack(L, funcr);  /* previous call may change the stack */
     }
+    /* 创建一个新的CallInfo结构, 保存当前函数调用的相关信息:top, base, func */
     ci = inc_ci(L);  /* now `enter' new function */
     ci->func = func;
     L->base = ci->base = base;
@@ -342,6 +351,9 @@ static StkId callrethooks (lua_State *L, StkId firstResult) {
 }
 
 
+/*
+** 执行函数返回部分. 函数调用 = luaD_precall + luaD_poscall
+ */
 int luaD_poscall (lua_State *L, StkId firstResult) {
   StkId res;
   int wanted, i;
@@ -455,6 +467,9 @@ LUA_API int lua_yield (lua_State *L, int nresults) {
 }
 
 
+/*
+** 受保护模式函数调用
+ */
 int luaD_pcall (lua_State *L, Pfunc func, void *u,
                 ptrdiff_t old_top, ptrdiff_t ef) {
   int status;
@@ -504,6 +519,8 @@ static void f_parser (lua_State *L, void *ud) {
   cl->l.p = tf;
   for (i = 0; i < tf->nups; i++)  /* initialize eventual upvalues */
     cl->l.upvals[i] = luaF_newupval(L);
+
+  /*把luaY_parser分析好的Proto打包进Closure, 再压入堆栈 */
   setclvalue(L, L->top, cl);
   incr_top(L);
 }
