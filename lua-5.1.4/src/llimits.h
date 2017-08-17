@@ -90,6 +90,7 @@ typedef lu_int32 Instruction;
 
 
 /* maximum stack for a Lua function */
+/* lua函数最大栈帧尺寸 */
 #define MAXSTACK	250
 
 
