@@ -4,7 +4,64 @@
 ** See Copyright Notice in lua.h
 */
 
+/*
+	chunk ::= {stat [`;´]} [laststat [`;´]]
 
+	block ::= chunk
+
+	stat ::=  varlist `=´ explist |
+		 functioncall |
+		 do block end |
+		 while exp do block end |
+		 repeat block until exp |
+		 if exp then block {elseif exp then block} [else block] end |
+		 for Name `=´ exp `,´ exp [`,´ exp] do block end |
+		 for namelist in explist do block end |
+		 function funcname funcbody |
+		 local function Name funcbody |
+		 local namelist [`=´ explist]
+
+	laststat ::= return [explist] | break
+
+	funcname ::= Name {`.´ Name} [`:´ Name]
+
+	varlist ::= var {`,´ var}
+
+	var ::=  Name | prefixexp `[´ exp `]´ | prefixexp `.´ Name
+
+	namelist ::= Name {`,´ Name}
+
+	explist ::= {exp `,´} exp
+
+	exp ::=  nil | false | true | Number | String | `...´ | function |
+		 prefixexp | tableconstructor | exp binop exp | unop exp
+
+	prefixexp ::= var | functioncall | `(´ exp `)´
+
+	functioncall ::=  prefixexp args | prefixexp `:´ Name args
+
+	args ::=  `(´ [explist] `)´ | tableconstructor | String
+
+	function ::= function funcbody
+
+	funcbody ::= `(´ [parlist] `)´ block end
+
+	parlist ::= namelist [`,´ `...´] | `...´
+
+	tableconstructor ::= `{´ [fieldlist] `}´
+
+	fieldlist ::= field {fieldsep field} [fieldsep]
+
+	field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp
+
+	fieldsep ::= `,´ | `;´
+
+	binop ::= `+´ | `-´ | `*´ | `/´ | `^´ | `%´ | `..´ |
+		 `<´ | `<=´ | `>´ | `>=´ | `==´ | `~=´ |
+		 and | or
+
+	unop ::= `-´ | not | `#´
+ */
 #include <string.h>
 
 #define lparser_c
@@ -86,6 +143,9 @@ static int testnext (LexState *ls, int c) {
 }
 
 
+/*
+** 判断是否为预期的词法元素
+ */
 static void check (LexState *ls, int c) {
   if (ls->t.token != c)
     error_expected(ls, c);
@@ -123,6 +183,9 @@ static TString *str_checkname (LexState *ls) {
 }
 
 
+/*
+** 初始化表达式描述
+ */
 static void init_exp (expdesc *e, expkind k, int i) {
   e->f = e->t = NO_JUMP;
   e->k = k;
@@ -140,6 +203,9 @@ static void checkname(LexState *ls, expdesc *e) {
 }
 
 
+/*
+** 注册局部变量名, 但没有保存变量值
+ */
 static int registerlocalvar (LexState *ls, TString *varname) {
   FuncState *fs = ls->fs;
   Proto *f = fs->f;
@@ -159,6 +225,7 @@ static int registerlocalvar (LexState *ls, TString *varname) {
 
 static void new_localvar (LexState *ls, TString *name, int n) {
   FuncState *fs = ls->fs;
+  /* 检查是否超过单个函数局部变量最大个数 */
   luaY_checklimit(fs, fs->nactvar+n+1, LUAI_MAXVARS, "local variables");
   fs->actvar[fs->nactvar+n] = cast(unsigned short, registerlocalvar(ls, name));
 }
@@ -249,7 +316,7 @@ static void singlevar (LexState *ls, expdesc *var) {
   TString *varname = str_checkname(ls);
   FuncState *fs = ls->fs;
   if (singlevaraux(fs, varname, var, 1) == VGLOBAL)
-    var->u.s.info = luaK_stringK(fs, varname);  /* info points to global name */
+    var->u.s.info = luaK_stringK(fs, varname);  /* 指向变量名在寄存器的索引 */ /* info points to global name */
 }
 
 
@@ -392,19 +459,20 @@ static void close_func (LexState *ls) {
 
 
 /*
-** 语法分析主函数
+** 语法分析主函数. 函数原型同`luaU_undump`
+** 一次遍历lua脚本, 完成词法分析, 语法分析, 代码生成, 生成的`opcode`保存`Proto->code`数组中
  */
+
 Proto *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff, const char *name) {
   struct LexState lexstate;
   struct FuncState funcstate;
   lexstate.buff = buff;
   luaX_setinput(L, &lexstate, z, luaS_new(L, name));
   open_func(&lexstate, &funcstate);
-  funcstate.f->is_vararg = VARARG_ISVARARG;  /* 主函数的参数总是变长参数 */ /* main func. is always vararg */
-  luaX_next(&lexstate);  /* 预读一个token */ /* read first token */
-  /* 解析程序块 */
-  chunk(&lexstate);
-  check(&lexstate, TK_EOS);
+  funcstate.f->is_vararg = VARARG_ISVARARG;   /* 主函数的参数总是变长参数 */ /* main func. is always vararg */
+  luaX_next(&lexstate);                       /* 预读一个token */ /* read first token */
+  chunk(&lexstate);                           /* 解析程序块 */
+  check(&lexstate, TK_EOS);                   /* 检查是否到达lua文件结尾 */
   close_func(&lexstate);
   lua_assert(funcstate.prev == NULL);
   lua_assert(funcstate.f->nups == 0);
@@ -447,11 +515,11 @@ static void yindex (LexState *ls, expdesc *v) {
 
 
 struct ConsControl {
-  expdesc v;  /* last list item read */
-  expdesc *t;  /* table descriptor */
-  int nh;  /* total number of `record' elements */
-  int na;  /* total number of array elements */
-  int tostore;  /* number of array elements pending to be stored */
+  expdesc v;  /* 上一次读入的列表项 *//* last list item read */
+  expdesc *t;  /* 表描述符 */ /* table descriptor */
+  int nh;  /* `record`元素个数 */ /* total number of `record' elements */
+  int na;  /* 数组元素个数 */ /* total number of array elements */
+  int tostore;  /* 待存储数组元素个数 *//* number of array elements pending to be stored */
 };
 
 
@@ -607,12 +675,15 @@ static void body (LexState *ls, expdesc *e, int needself, int line) {
   pushclosure(ls, &new_fs, e);
 }
 
-
+/*
+** 解析表达式列表
+ */
 static int explist1 (LexState *ls, expdesc *v) {
   /* explist1 -> expr { `,' expr } */
+  /* 表达式列表 */
   int n = 1;  /* at least one expression */
   expr(ls, v);
-  while (testnext(ls, ',')) {
+  while (testnext(ls, ',')) {       /* 多个表达式依次调用`expr`进行解析 */
     luaK_exp2nextreg(ls->fs, v);
     expr(ls, v);
     n++;
@@ -739,6 +810,9 @@ static void primaryexp (LexState *ls, expdesc *v) {
 }
 
 
+/*
+** 常数, 变量, 字符串, 函数等简单表达式语法分析
+ */
 static void simpleexp (LexState *ls, expdesc *v) {
   /* simpleexp -> NUMBER | STRING | NIL | true | false | ... |
                   constructor | FUNCTION body | primaryexp */
@@ -828,16 +902,16 @@ static BinOpr getbinopr (int op) {
 
 
 static const struct {
-  lu_byte left;  /* left priority for each binary operator */
-  lu_byte right; /* right priority */
+  lu_byte left;  /* 二元运算符左优先级 *//* left priority for each binary operator */
+  lu_byte right; /* 右优先级 */ /* right priority */
 } priority[] = {  /* ORDER OPR */
    {6, 6}, {6, 6}, {7, 7}, {7, 7}, {7, 7},  /* `+' `-' `/' `%' */
-   {10, 9}, {5, 4},                 /* power and concat (right associative) */
-   {3, 3}, {3, 3},                  /* equality and inequality */
-   {3, 3}, {3, 3}, {3, 3}, {3, 3},  /* order */
-   {2, 2}, {1, 1}                   /* logical (and/or) */
+   {10, 9}, {5, 4},                 /* 乘幂和拼接(右结合) */ /* power and concat (right associative) */
+   {3, 3}, {3, 3},                  /* 相等和不等 */ /* equality and inequality */
+   {3, 3}, {3, 3}, {3, 3}, {3, 3},  /* 排序 *//* order */
+   {2, 2}, {1, 1}                   /* 逻辑(与/或) *//* logical (and/or) */
 };
-
+/* 单目运算符优先级 */
 #define UNARY_PRIORITY	8  /* priority for unary operators */
 
 
@@ -918,7 +992,7 @@ static void block (LexState *ls) {
 */
 struct LHS_assign {
   struct LHS_assign *prev;
-  expdesc v;  /* variable (global, local, upvalue, or indexed) */
+  expdesc v;    /* 变量(全局变量, 局部变量, upvalue, 或者索引变量*/ */ /* variable (global, local, upvalue, or indexed) */
 };
 
 
@@ -1206,14 +1280,14 @@ static void localstat (LexState *ls) {
   expdesc e;
   do {
     new_localvar(ls, str_checkname(ls), nvars++);
-  } while (testnext(ls, ','));
-  if (testnext(ls, '='))
+  } while (testnext(ls, ',')); /* LOCAL Name {`,' NAME} 部分 */
+  if (testnext(ls, '='))       /* [`=' explist1] 部分 */
     nexps = explist1(ls, &e);
   else {
     e.k = VVOID;
     nexps = 0;
   }
-  adjust_assign(ls, nvars, nexps, &e);
+  adjust_assign(ls, nvars, nexps, &e); /* 等号两边变量和表达式个数不同时做相应调整, 变量多会置多余的变量置为nil */
   adjustlocalvars(ls, nvars);
 }
 

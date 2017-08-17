@@ -44,8 +44,8 @@ typedef struct expdesc {
     struct { int info, aux; } s;
     lua_Number nval;
   } u;
-  int t;  /* patch list of `exit when true' */
-  int f;  /* patch list of `exit when false' */
+  int t;  /* 真值回填列表 */ /* patch list of `exit when true' */
+  int f;  /* 假值回填列表 */ /* patch list of `exit when false' */
 } expdesc;
 
 
@@ -62,15 +62,16 @@ struct BlockCnt;  /* defined in lparser.c */
 /*
 ** 每解析一个"function"即建立一个"FuncState"数据结构
  */
+
 typedef struct FuncState {
-  Proto *f;  /* current function header */
+  Proto *f;  /* 当前函数头 */ /* current function header */
   Table *h;  /* table to find (and reuse) elements in `k' */
   struct FuncState *prev;  /* 外层函数状态. 栈底是mainfunc的FuncState, 栈顶是当前正在分析的FuncState */ /* enclosing function */
   struct LexState *ls;  /* 语法状态 */ /* lexical state */
   struct lua_State *L;  /* copy of the Lua state */
-  struct BlockCnt *bl;  /* chain of current blocks */
-  int pc;  /* next position to code (equivalent to `ncode') */
-  int lasttarget;   /* `pc' of last `jump target' */
+  struct BlockCnt *bl;  /* 程序块链表 */ /* chain of current blocks */
+  int pc;  /* 程序计数器. 指示下一个代码位置 */ /* next position to code (equivalent to `ncode') */
+  int lasttarget;   /* 上一次`jump target`的pc *//* `pc' of last `jump target' */
   int jpc;  /* list of pending jumps to `pc' */
   int freereg;  /* 记录当前栈中可用的数据位置, 每分配一个位置, 都会将freereg加一, 反之则减一 */ /* first free register */
   int nk;  /* number of elements in `k' */
