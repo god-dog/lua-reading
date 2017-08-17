@@ -108,38 +108,44 @@ static void DumpConstants(const Proto* f, DumpState* D)
  for (i=0; i<n; i++) DumpFunction(f->p[i],f->source,D);
 }
 
+/*
+** 写入调试信息
+ */
 static void DumpDebug(const Proto* f, DumpState* D)
 {
  int i,n;
  n= (D->strip) ? 0 : f->sizelineinfo;
- DumpVector(f->lineinfo,n,sizeof(int),D);
+ DumpVector(f->lineinfo,n,sizeof(int),D);         /* 源码位置 */
  n= (D->strip) ? 0 : f->sizelocvars;
- DumpInt(n,D);
+ DumpInt(n,D);                                    /* 局部变量列表 */
  for (i=0; i<n; i++)
  {
   DumpString(f->locvars[i].varname,D);
   DumpInt(f->locvars[i].startpc,D);
   DumpInt(f->locvars[i].endpc,D);
  }
- n= (D->strip) ? 0 : f->sizeupvalues;
+ n= (D->strip) ? 0 : f->sizeupvalues;             /* upvalue列表 */
  DumpInt(n,D);
  for (i=0; i<n; i++) DumpString(f->upvalues[i],D);
 }
 
 static void DumpFunction(const Proto* f, const TString* p, DumpState* D)
 {
- DumpString((f->source==p || D->strip) ? NULL : f->source,D);
- DumpInt(f->linedefined,D);
- DumpInt(f->lastlinedefined,D);
- DumpChar(f->nups,D);
- DumpChar(f->numparams,D);
- DumpChar(f->is_vararg,D);
- DumpChar(f->maxstacksize,D);
- DumpCode(f,D);
- DumpConstants(f,D);
- DumpDebug(f,D);
+ DumpString((f->source==p || D->strip) ? NULL : f->source,D); /* 源文件名 */
+ DumpInt(f->linedefined,D);                                   /* 定义开始行 */
+ DumpInt(f->lastlinedefined,D);                               /* 定义结束行 */
+ DumpChar(f->nups,D);                                         /* upvalue数量 */
+ DumpChar(f->numparams,D);                                    /* 参数数量 */
+ DumpChar(f->is_vararg,D);                                    /* 是否可变参数标识 */
+ DumpChar(f->maxstacksize,D);                                 /* 最大栈大小 */
+ DumpCode(f,D);                                               /* 指令列表 */
+ DumpConstants(f,D);                                          /* 常量列表 */
+ DumpDebug(f,D);                                              /* 调试信息相关 */
 }
 
+/*
+** 写入文件头
+ */
 static void DumpHeader(DumpState* D)
 {
  char h[LUAC_HEADERSIZE];
@@ -163,7 +169,7 @@ int luaU_dump (lua_State* L, const Proto* f, lua_Writer w, void* data, int strip
  D.status=0;
  /* 写入文件头 */
  DumpHeader(&D);
- /* 写入文件主体 */
+ /* 写入顶层函数 */
  DumpFunction(f,NULL,&D);
  return D.status;
 }
