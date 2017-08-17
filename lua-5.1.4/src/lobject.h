@@ -280,11 +280,14 @@ typedef union Udata {
 /*
 ** Function Prototypes
 */
+/*
+** 函数原型. 语法分析阶段核心数据结构
+ */
 typedef struct Proto {
   CommonHeader;
-  TValue *k;  /* 常量表: 函数运行期需要的所有常量, 使用常量表id进行索引 */ /* constants used by the function */
-  Instruction *code; /* 指令列表: 包含函数编译后生成的虚拟机指令 */
-  struct Proto **p;  /* Proto表：嵌套于该函数的所有子函数的Proto列表, OP_CLOSURE指令中的proto id通过proto表进行索引 */ /* functions defined inside the function */
+  TValue *k;  /* 常量列表数组: 存放函数运行期需要的所有常量, 使用常量表id进行索引 */ /* constants used by the function */
+  Instruction *code; /* 指令列表/数组: 存放函数编译后生成的虚拟机指令 */
+  struct Proto **p;  /* Proto表：嵌套于该函数的所有内部函数的Proto列表, OP_CLOSURE指令中的proto id通过proto表进行索引 */ /* functions defined inside the function */
   int *lineinfo;  /* 指令行号信息, 调试之用 */ /* map from opcodes to source lines */
   struct LocVar *locvars;  /* 局部变量信息: 函数中的所有局部变量名称及其生命周期. 由于所有局部变量在运行期都转化成了寄存器id, 这些信息仅供debug使用 */ /* information about local variables */
   TString **upvalues;  /* upvalue names */
@@ -298,7 +301,7 @@ typedef struct Proto {
   int linedefined;      /* 函数定义起始行号, 即 `function` 关键字所在的行号 */
   int lastlinedefined;  /* 函数定义结束行号, 即 `end` 关键字所在的行号 */
   GCObject *gclist;
-  lu_byte nups;  /* number of upvalues */
+  lu_byte nups;       /* upvalue个数 *//* number of upvalues */
   lu_byte numparams;  /* 参数个数 */
   lu_byte is_vararg;  /* 参数是否为可变参数 "..." */
   lu_byte maxstacksize;
@@ -311,10 +314,13 @@ typedef struct Proto {
 #define VARARG_NEEDSARG		4
 
 
+/*
+** 局部变量
+ */
 typedef struct LocVar {
-  TString *varname;
-  int startpc;  /* first point where variable is active */
-  int endpc;    /* first point where variable is dead */
+  TString *varname;   /* 局部变量名 */
+  int startpc;        /* 有效开始时间 */ /* first point where variable is active */
+  int endpc;          /* 失效截止时间 */ /* first point where variable is dead */
 } LocVar;
 
 
@@ -361,7 +367,8 @@ typedef struct CClosure {
 /*
 ** LClosure: lua内部函数的闭包, 由lua虚拟机管理
  * Closure对象是lua运行期的一个函数实例对象, Proto则是编译期Closure的原型对象
- * 拥有upvalue的函数即为闭包, 没有upvalue的闭包是函数
+ * 拥有upvalue的函数即为闭包, 没有upvalue的闭包是函数.
+ * 函数是编译期概念, 是静态的; 闭包是运行期概念，是动态的.
  */
 typedef struct LClosure {
   ClosureHeader;

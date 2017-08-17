@@ -87,14 +87,19 @@ int luaO_rawequalObj (const TValue *t1, const TValue *t2) {
 }
 
 
+/*
+** 字符串转数值
+ * @param s [in]        待转换字符串
+ * @param result [out]  结果
+ */
 int luaO_str2d (const char *s, lua_Number *result) {
   char *endptr;
   *result = lua_str2number(s, &endptr);
   if (endptr == s) return 0;  /* conversion failed */
-  if (*endptr == 'x' || *endptr == 'X')  /* maybe an hexadecimal constant? */
+  if (*endptr == 'x' || *endptr == 'X')  /* 十六进制? */ /* maybe an hexadecimal constant? */
     *result = cast_num(strtoul(s, &endptr, 16));
   if (*endptr == '\0') return 1;  /* most common case */
-  while (isspace(cast(unsigned char, *endptr))) endptr++;
+  while (isspace(cast(unsigned char, *endptr))) endptr++; /* 忽略空白字符 */
   if (*endptr != '\0') return 0;  /* invalid trailing characters? */
   return 1;
 }
