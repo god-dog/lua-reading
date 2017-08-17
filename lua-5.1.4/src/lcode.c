@@ -226,6 +226,7 @@ static void freereg (FuncState *fs, int reg) {
 
 
 static void freeexp (FuncState *fs, expdesc *e) {
+  /* 表达式如果不需要重新定位, 则回收所占用的寄存器空间 */
   if (e->k == VNONRELOC)
     freereg(fs, e->u.s.info);
 }
@@ -307,7 +308,8 @@ void luaK_setoneret (FuncState *fs, expdesc *e) {
 
 
 void luaK_dischargevars (FuncState *fs, expdesc *e) {
-  /* 根据`e->k`的表达式类型,构建出对应的opcode放在`e->u.s.info`中 */
+  /* 根据`e->k`的表达式类型,构建出对应的opcode放在`e->u.s.info`中.
+   若为UpVal或者Global类型的变量, 非当前函数定义的变量, 不会出现在当前函数栈中, 则要将k置为VRELOCABLE, 重新定位. */
   switch (e->k) {
     case VLOCAL: {
       e->k = VNONRELOC;
@@ -347,7 +349,7 @@ static int code_label (FuncState *fs, int A, int b, int jump) {
 
 
 /*
-** 将每种表达式类型对应的Opcode写到预留的栈
+** 将每种表达式类型对应的Opcode写到预留的栈空间
  */
 static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
   luaK_dischargevars(fs, e);
@@ -369,6 +371,7 @@ static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
       break;
     }
     case VRELOCABLE: {
+      /* 若表达式是需要重定位(VRELOCABLE类型), 则取出原指令, 修改对应的寄存器位置 */
       Instruction *pc = &getcode(fs, e);
       SETARG_A(*pc, reg);
       break;
@@ -420,6 +423,9 @@ static void exp2reg (FuncState *fs, expdesc *e, int reg) {
 }
 
 
+/*
+** 将分析好的表达式信息转换成对应的opcode
+ */
 void luaK_exp2nextreg (FuncState *fs, expdesc *e) {
   luaK_dischargevars(fs, e);
   freeexp(fs, e);
@@ -803,6 +809,9 @@ void luaK_fixline (FuncState *fs, int line) {
 }
 
 
+/*
+** 写入指令`i`
+ */
 static int luaK_code (FuncState *fs, Instruction i, int line) {
   Proto *f = fs->f;
   dischargejpc(fs);  /* `pc' will change */
