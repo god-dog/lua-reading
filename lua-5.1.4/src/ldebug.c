@@ -314,6 +314,12 @@ static int checkArgMode (const Proto *pt, int r, enum OpArgMask mode) {
 }
 
 
+/*
+** 安装vm执行流模拟一段opcode执行, 执行到`lastpc`, 同时返回修改`reg`的所在指令.
+** 功能:
+** 1. `loadstring`用于检查代码是否被篡改, 是否合法
+** 2. `lua_getinfo`用于查看某个first class的function是global,local, 还是upval
+ */
 static Instruction symbexec (const Proto *pt, int lastpc, int reg) {
   int pc;
   int last;  /* stores position of last instruction that changed `reg' */
