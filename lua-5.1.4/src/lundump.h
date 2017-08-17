@@ -25,12 +25,14 @@ LUAI_FUNC void luaU_print (const Proto* f, int full);
 #endif
 
 /* for header of binary files -- this is Lua 5.1 */
+/* 二进制版本号, 写入文件头部 */
 #define LUAC_VERSION		0x51
 
 /* for header of binary files -- this is the official format */
 #define LUAC_FORMAT		0
 
 /* size of header of binary files */
+/* lua5.1二进制文件头部大小严格等于12字节, 否则系统拒绝加载该二进制文件. */
 #define LUAC_HEADERSIZE		12
 
 #endif
