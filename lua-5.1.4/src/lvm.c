@@ -35,7 +35,7 @@
 
 
 /* limit for table tag-method chains (to avoid loops) */
-/* 元表最大深度限制 */
+/* 元方法链最大深度限制. 避免死循环 */
 #define MAXTAGLOOP	100
 
 
@@ -52,6 +52,7 @@ const TValue *luaV_tonumber (const TValue *obj, TValue *n) {
 
 
 int luaV_tostring (lua_State *L, StkId obj) {
+  /* 非数值类型直接返回0 */
   if (!ttisnumber(obj))
     return 0;
   else {
@@ -64,6 +65,9 @@ int luaV_tostring (lua_State *L, StkId obj) {
 }
 
 
+/*
+** 每次指令解析前的勾子调用
+ */
 static void traceexec (lua_State *L, const Instruction *pc) {
   lu_byte mask = L->hookmask;
   const Instruction *oldpc = L->savedpc;
@@ -83,7 +87,9 @@ static void traceexec (lua_State *L, const Instruction *pc) {
   }
 }
 
-
+/*
+** 元方法调用. 适用于`__index`, 算术运算, 大小比较的元方法
+ */
 static void callTMres (lua_State *L, StkId res, const TValue *f,
                         const TValue *p1, const TValue *p2) {
   ptrdiff_t result = savestack(L, res);
@@ -99,7 +105,9 @@ static void callTMres (lua_State *L, StkId res, const TValue *f,
 }
 
 
-
+/*
+** 元方法调用. 适用于`__newindex`
+ */
 static void callTM (lua_State *L, const TValue *f, const TValue *p1,
                     const TValue *p2, const TValue *p3) {
   setobj2s(L, L->top, f);  /* push function */
@@ -111,7 +119,9 @@ static void callTM (lua_State *L, const TValue *f, const TValue *p1,
   luaD_call(L, L->top - 4, 0);
 }
 
-
+/*
+** 表读取操作. 必要时调用元方法__index.
+ */
 void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
   int loop;
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
@@ -139,6 +149,9 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
 }
 
 
+/*
+** 表更新操作. 必要时调用元方法__newindex.
+ */
 void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
   int loop;
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
@@ -166,6 +179,9 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
 }
 
 
+/*
+** 单目和双目元方法调用. 适用于算术运算, 取表长度或拼接
+ */
 static int call_binTM (lua_State *L, const TValue *p1, const TValue *p2,
                        StkId res, TMS event) {
   const TValue *tm = luaT_gettmbyobj(L, p1, event);  /* try first operand */
@@ -225,7 +241,9 @@ static int l_strcmp (const TString *ls, const TString *rs) {
   }
 }
 
-
+/*
+** 比较两个对象值是否满足小于关系. 必要时调用元方法`__lt`
+ */
 int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
   int res;
   if (ttype(l) != ttype(r))
@@ -257,7 +275,7 @@ static int lessequal (lua_State *L, const TValue *l, const TValue *r) {
 
 
 /*
-** 比较两个弱类型对象值是否相等
+** 比较两个对象值是否相等. 必要时调用元方法`__eq`
  */
 int luaV_equalval (lua_State *L, const TValue *t1, const TValue *t2) {
   const TValue *tm;
@@ -286,6 +304,9 @@ int luaV_equalval (lua_State *L, const TValue *t1, const TValue *t2) {
 }
 
 
+/*
+** 默认拼接操作. 必要时调用元方法`__concat`
+ */
 void luaV_concat (lua_State *L, int total, int last) {
   do {
     StkId top = L->base + last + 1;
@@ -321,6 +342,9 @@ void luaV_concat (lua_State *L, int total, int last) {
 }
 
 
+/*
+** 算术操作
+ */
 static void Arith (lua_State *L, StkId ra, const TValue *rb,
                    const TValue *rc, TMS op) {
   TValue tempb, tempc;
@@ -356,6 +380,7 @@ static void Arith (lua_State *L, StkId ra, const TValue *rb,
 /* to be used after possible stack reallocation */
 #define RB(i)	check_exp(getBMode(GET_OPCODE(i)) == OpArgR, base+GETARG_B(i))
 #define RC(i)	check_exp(getCMode(GET_OPCODE(i)) == OpArgR, base+GETARG_C(i))
+/* 判断第八位是否为1, 为1则从K数组(常量数组)中读取数据, 否则从函数栈寄存器中读取数据 */
 #define RKB(i)	check_exp(getBMode(GET_OPCODE(i)) == OpArgK, \
 	ISK(GETARG_B(i)) ? k+INDEXK(GETARG_B(i)) : base+GETARG_B(i))
 #define RKC(i)	check_exp(getCMode(GET_OPCODE(i)) == OpArgK, \
@@ -392,7 +417,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
   const Instruction *pc;
  reentry:  /* entry point */
   lua_assert(isLua(L->ci));
-  pc = L->savedpc;
+  pc = L->savedpc;              /* @see luaD_precall() `L->savedpc = p->code;` */
   cl = &clvalue(L->ci->func)->l;
   base = L->base;
   k = cl->p->k;

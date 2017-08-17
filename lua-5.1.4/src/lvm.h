@@ -13,8 +13,10 @@
 #include "ltm.h"
 
 
+/* 对象转字符串通用宏. 对象仅限字符串和数值 */
 #define tostring(L,o) ((ttype(o) == LUA_TSTRING) || (luaV_tostring(L, o)))
 
+/* 对象转数值通用宏. 对象仅限数值和字符串 */
 #define tonumber(o,n)	(ttype(o) == LUA_TNUMBER || \
                          (((o) = luaV_tonumber(o,n)) != NULL))
 
