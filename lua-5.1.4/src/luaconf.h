@@ -245,6 +245,11 @@
 ** CHANGE them if you want different prompts. (You can also change the
 ** prompts dynamically, assigning to globals _PROMPT/_PROMPT2.)
 */
+/*
+@@ LUA_PROMPT 独立lua解释器首行默认提示符
+@@ LUA_PROMPT2 独立lua解释器次行(续行)默认提示符
+** 可以自行修改. (通过设置全局变量`_PROMPT`/`_PROMPT2`可以动态修改)
+ */
 #define LUA_PROMPT		"> "
 #define LUA_PROMPT2		">> "
 
