@@ -28,6 +28,7 @@
 #define	LUA_SIGNATURE	"\033Lua"
 
 /* option for multiple returns in `lua_pcall' and `lua_call' */
+/* 多值返回标识 */
 #define LUA_MULTRET	(-1)
 
 
@@ -303,7 +304,9 @@ LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
 /*
 ** compatibility macros and functions
 */
-
+/*
+** 兼容老版本的宏和函数
+ */
 #define lua_open()	luaL_newstate()
 
 #define lua_getregistry(L)	lua_pushvalue(L, LUA_REGISTRYINDEX)

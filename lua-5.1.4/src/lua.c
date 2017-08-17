@@ -39,6 +39,9 @@ static void laction (int i) {
 }
 
 
+/*
+** 打印lua解释用法
+ */
 static void print_usage (void) {
   fprintf(stderr,
   "usage: %s [options] [script [args]].\n"
@@ -55,6 +58,11 @@ static void print_usage (void) {
 }
 
 
+/*
+** 公共错误消息输出方法
+** @param pname 错误项. 相当于key
+** @param msg 错误消息. 相当于value
+ */
 static void l_message (const char *pname, const char *msg) {
   if (pname) fprintf(stderr, "%s: ", pname);
   fprintf(stderr, "%s\n", msg);
@@ -62,6 +70,9 @@ static void l_message (const char *pname, const char *msg) {
 }
 
 
+/*
+** 输出栈顶错误信息
+ */
 static int report (lua_State *L, int status) {
   if (status && !lua_isnil(L, -1)) {
     const char *msg = lua_tostring(L, -1);
@@ -73,6 +84,9 @@ static int report (lua_State *L, int status) {
 }
 
 
+/*
+**  间接调用Lua标准库的debug.traceback函数
+ */
 static int traceback (lua_State *L) {
   if (!lua_isstring(L, 1))  /* 'message' not a string? */
     return 1;  /* keep it intact */
@@ -93,6 +107,9 @@ static int traceback (lua_State *L) {
 }
 
 
+/*
+** 加载脚本后以保护模式运行VM
+ */
 static int docall (lua_State *L, int narg, int clear) {
   int status;
   int base = lua_gettop(L) - narg;  /* function index */
@@ -108,16 +125,22 @@ static int docall (lua_State *L, int narg, int clear) {
 }
 
 
+/*
+** 输出版本信息
+ */
 static void print_version (void) {
   l_message(NULL, LUA_RELEASE "  " LUA_COPYRIGHT);
 }
 
 
+/*
+** 读取命令行参数.
+ */
 static int getargs (lua_State *L, char **argv, int n) {
   int narg;
   int i;
   int argc = 0;
-  while (argv[argc]) argc++;  /* count total number of arguments */
+  while (argv[argc]) argc++;  /* 统计参数个数 */ /* count total number of arguments */
   narg = argc - (n + 1);  /* number of arguments to the script */
   luaL_checkstack(L, narg + 3, "too many arguments to script");
   for (i=n+1; i < argc; i++)
@@ -131,18 +154,36 @@ static int getargs (lua_State *L, char **argv, int n) {
 }
 
 
+/*
+** 执行lua脚本文件
+ */
+/*
++-------------+                   +--------------+
+|luaY_parser()|-----> Proto ----->|luaV_execute()|
++-------------+                   +--------------+
+ */
 static int dofile (lua_State *L, const char *name) {
   int status = luaL_loadfile(L, name) || docall(L, 0, 1);
   return report(L, status);
 }
 
-
+/*
+** 执行lua语句
+ */
+/*
++-------------+                   +--------------+
+|luaY_parser()|-----> Proto ----->|luaV_execute()|
++-------------+                   +--------------+
+ */
 static int dostring (lua_State *L, const char *s, const char *name) {
   int status = luaL_loadbuffer(L, s, strlen(s), name) || docall(L, 0, 1);
   return report(L, status);
 }
 
 
+/*
+** 间接调用`require`加载lua模块
+ */
 static int dolibrary (lua_State *L, const char *name) {
   lua_getglobal(L, "require");
   lua_pushstring(L, name);
@@ -150,6 +191,9 @@ static int dolibrary (lua_State *L, const char *name) {
 }
 
 
+/*
+** 读取lua交互模式提示符
+ */
 static const char *get_prompt (lua_State *L, int firstline) {
   const char *p;
   lua_getfield(L, LUA_GLOBALSINDEX, firstline ? "_PROMPT" : "_PROMPT2");
@@ -160,6 +204,10 @@ static const char *get_prompt (lua_State *L, int firstline) {
 }
 
 
+/*
+** 状态机出现语法出错后判断是否遇到<eof>.
+** 用于交互模式输入时多行预测(可能语句输入不完整)
+ */
 static int incomplete (lua_State *L, int status) {
   if (status == LUA_ERRSYNTAX) {
     size_t lmsg;
@@ -173,7 +221,9 @@ static int incomplete (lua_State *L, int status) {
   return 0;  /* else... */
 }
 
-
+/*
+** 交互模式读取stdin一行, 无循环
+ */
 static int pushline (lua_State *L, int firstline) {
   char buffer[LUA_MAXINPUT];
   char *b = buffer;
@@ -192,7 +242,9 @@ static int pushline (lua_State *L, int firstline) {
   return 1;
 }
 
-
+/*
+** 交互模式读取stdin一行, 然后循环读取剩余未输入完整的内容
+ */
 static int loadline (lua_State *L) {
   int status;
   lua_settop(L, 0);
@@ -213,6 +265,9 @@ static int loadline (lua_State *L) {
 }
 
 
+/*
+** 交互模式
+ */
 static void dotty (lua_State *L) {
   int status;
   const char *oldprogname = progname;
@@ -236,10 +291,18 @@ static void dotty (lua_State *L) {
 }
 
 
+/*
+** 带参数方式运行脚本. `arg`中注入参数列表
+ */
+/*
++-------------+                   +--------------+
+|luaY_parser()|-----> Proto ----->|luaV_execute()|
++-------------+                   +--------------+
+ */
 static int handle_script (lua_State *L, char **argv, int n) {
   int status;
   const char *fname;
-  int narg = getargs(L, argv, n);  /* collect arguments */
+  int narg = getargs(L, argv, n);  /* 读取命令行参数, 初始化表类型全局变量`arg` */ /* collect arguments */
   lua_setglobal(L, "arg");
   fname = argv[n];
   if (strcmp(fname, "-") == 0 && strcmp(argv[n-1], "--") != 0) 
@@ -256,9 +319,27 @@ static int handle_script (lua_State *L, char **argv, int n) {
 
 
 /* check that argument has no extra characters at the end */
+/* 检查控制台命令行参数结尾有无多余字符 */
 #define notail(x)	{if ((x)[2] != '\0') return -1;}
 
 
+/*
+** 扫描命令行参数. (首次扫描, 二次扫描 @see runargs)
+** @param pi 交互模式
+** @param pv 输出版本
+** @param pe 参数中包括lua脚本字符串
+** 返回参数位置
+ */
+/*
+lua -e "sin=math.sin" script a b
+--------------------------------
+arg[-3] = "lua"
+arg[-2] = "-e"
+arg[-1] = "sin=math.sin"
+arg[0] = "script"
+arg[1] = "a"
+arg[2] = "b"
+ */
 static int collectargs (char **argv, int *pi, int *pv, int *pe) {
   int i;
   for (i = 1; argv[i] != NULL; i++) {
@@ -285,13 +366,16 @@ static int collectargs (char **argv, int *pi, int *pv, int *pe) {
           if (argv[i] == NULL) return -1;
         }
         break;
-      default: return -1;  /* invalid option */
+      default: return -1;  /* 非法参数选项 */ /* invalid option */
     }
   }
   return 0;
 }
 
 
+/*
+** 带参数运行. (二次扫描命令行参数). 执行 `-e` (lua语句) 和 `-l` (文件)参数
+ */
 static int runargs (lua_State *L, char **argv, int n) {
   int i;
   for (i = 1; i < n; i++) {
@@ -321,6 +405,9 @@ static int runargs (lua_State *L, char **argv, int n) {
 }
 
 
+/*
+** 读取`LUA_INIT`指定的lua脚本或lua语句
+ */
 static int handle_luainit (lua_State *L) {
   const char *init = getenv(LUA_INIT);
   if (init == NULL) return 0;  /* status OK */
@@ -348,13 +435,13 @@ static int pmain (lua_State *L) {
   int has_i = 0, has_v = 0, has_e = 0;
   globalL = L;
   if (argv[0] && argv[0][0]) progname = argv[0];
-  lua_gc(L, LUA_GCSTOP, 0);  /* stop collector during initialization */
-  luaL_openlibs(L);  /* open libraries */
-  lua_gc(L, LUA_GCRESTART, 0);
+  lua_gc(L, LUA_GCSTOP, 0);  /* 关闭gc */ /* stop collector during initialization */
+  luaL_openlibs(L);  /* 打开所有标准库 *//* open libraries */
+  lua_gc(L, LUA_GCRESTART, 0);  /* 重启gc */
   s->status = handle_luainit(L);
   if (s->status != 0) return 0;
   script = collectargs(argv, &has_i, &has_v, &has_e);
-  if (script < 0) {  /* invalid args? */
+  if (script < 0) {  /* 非法参数选项, 打印帮助 */ /* invalid args? */
     print_usage();
     s->status = 1;
     return 0;
@@ -363,7 +450,7 @@ static int pmain (lua_State *L) {
   s->status = runargs(L, argv, (script > 0) ? script : s->argc);
   if (s->status != 0) return 0;
   if (script)
-    s->status = handle_script(L, argv, script);
+    s->status = handle_script(L, argv, script); /* 执行脚本 */
   if (s->status != 0) return 0;
   if (has_i)
     dotty(L);
@@ -372,7 +459,7 @@ static int pmain (lua_State *L) {
       print_version();
       dotty(L);
     }
-    else dofile(L, NULL);  /* executes stdin as a file */
+    else dofile(L, NULL);  /* 控制台标准输入 */ /* executes stdin as a file */
   }
   return 0;
 }
