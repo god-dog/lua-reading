@@ -44,11 +44,13 @@ typedef struct LG {
 
 static void stack_init (lua_State *L1, lua_State *L) {
   /* initialize CallInfo array */
+  /* 初始化调用信息数组 */
   L1->base_ci = luaM_newvector(L, BASIC_CI_SIZE, CallInfo);
   L1->ci = L1->base_ci;
   L1->size_ci = BASIC_CI_SIZE;
   L1->end_ci = L1->base_ci + L1->size_ci - 1;
   /* initialize stack array */
+  /* 初始化栈数组 */
   L1->stack = luaM_newvector(L, BASIC_STACK_SIZE + EXTRA_STACK, TValue);
   L1->stacksize = BASIC_STACK_SIZE + EXTRA_STACK;
   L1->top = L1->stack;

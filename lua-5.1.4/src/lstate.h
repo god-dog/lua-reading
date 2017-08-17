@@ -74,10 +74,11 @@ typedef struct CallInfo {
 ** `global state', shared by all threads of this state
 */
 /*
-** 全局状态, 所有执行线程共享该状态
+** 全局状态, 所有执行线程共享该状态.
+** 一个进程只会有一个`global_State`, 但可能有多个`lua_State`, 两者之间是一对多的关系.
  */
 typedef struct global_State {
-  stringtable strt;  /* 全局字符串表 */ /* hash table for strings */
+  stringtable strt;  /* 全局字符串池 */ /* hash table for strings */
   lua_Alloc frealloc; /* 内存管理(分配/释放)函数指针. 可分别通过`lua_getallocf`和`lua_setallocf`访问和设置 */ /* function to reallocate memory */
   void *ud;         /* `frealloc`函数关联的参数 *//* auxiliary data to `frealloc' */
   lu_byte currentwhite;
@@ -115,11 +116,33 @@ typedef struct global_State {
  * lua_State中包括两个重要的数据结构, 一个是数组表示的数据栈, 一个是链表表示的函数调用栈
  * lua虚拟机模拟CPU, lua栈模拟内存
  */
+/*
+   Lua_State
++------------+
+|            |
+|  +-----+   |     +-------+----+
+|  | top +---+---->| argn  |R[n]|
+|  +-----+   |     +-------+----+
+|            |     |  ...  | .. |
+|            |     +-------+----+
+|            |     | arg2  |R[2]|
+|            |     +-------+----+
+|            |     | arg1  |R[1]|
+|  +-----+   |     +-------+----+
+|  |base |---+---->| func  |
+|  +-----+   |     +-------+
+|            |     |  ...  |
+|  +-----+   |     +-------+
+|  |stack|---+---->|       |
+|  +-----+   |     +-------+
+|            |
++------------+
+ */
 struct lua_State {
   CommonHeader;
   lu_byte status; /* 线程状态. @see LUA_YIELD: 1, LUA_ERRRUN: 2, LUA_ERRSYNTAX: 3, LUA_ERRMEM: 4, LUA_ERRERR: 5  */
-  StkId top;  /* 数据栈栈顶, 第一个可用的空闲位置 */ /* first free slot in the stack */
-  StkId base; /* 当前函数数据栈基址, 会随函数调用发生变化 */  /* base of current function */
+  StkId top;  /* 数据栈栈顶, 第一个可用的空闲位置, 入栈出栈时会相应增减`top` */ /* first free slot in the stack */
+  StkId base; /* 当前函数数据栈基址, 会随函数调用发生变化. OpCode相对`base`偏移读取数据 */  /* base of current function */
   global_State *l_G;  /* 全局状态指针 */
   CallInfo *ci;  /* 当前函数调用信息 */ /* call info for current function */
   const Instruction *savedpc; /* 当前函数程序计数器 */ /* `savedpc' of current function */
