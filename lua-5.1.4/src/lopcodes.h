@@ -34,10 +34,10 @@ enum OpMode {iABC, iABx, iAsBx};  /* basic instruction format */
 /*
 ** size and position of opcode arguments.
 */
-#define SIZE_C		9
-#define SIZE_B		9
-#define SIZE_Bx		(SIZE_C + SIZE_B)
-#define SIZE_A		8
+#define SIZE_C		9									/* C部分大小 */
+#define SIZE_B		9									/* B部分大小 */
+#define SIZE_Bx		(SIZE_C + SIZE_B)	/* Bx部分大小 */
+#define SIZE_A		8									/* A部分大小 */
 
 #define SIZE_OP		6
 
@@ -122,6 +122,7 @@ enum OpMode {iABC, iABx, iAsBx};  /* basic instruction format */
 #define BITRK		(1 << (SIZE_B - 1))
 
 /* test whether value is a constant */
+/* 测试是否常量 */
 #define ISK(x)		((x) & BITRK)
 
 /* gets the index of the constant */
@@ -158,7 +159,8 @@ enum OpMode {iABC, iABx, iAsBx};  /* basic instruction format */
 /* Lua虚拟机中的指令将32位分成三或四个域.
 ** OP域为指令部分, 占6位, 其他域表示操作数;
 ** A域总是占用8位, B域和C域分别占9位, 合起来可以组成18位的域: Bx(unsigned)和sBx(signed).
-** 大部分指令使用三地址格式, 其中A表示目的操作数, 一般为寄存器; B, C分别表示源操作数, 一般为寄存器或常数(形如RK(X)).
+** 大部分指令使用三地址格式, 其中A表示目的操作数, 一般为寄存器; B, C分别表示源操作数, 一般为寄存器或常数(形如RK(X)). 寄存器通常是指向当前栈帧中的索引, 0号寄存器是栈底位置.
+** 不像C API那样可以支持负索引. 栈顶索引会被编码为特定的操作数(通常是0).
 ** Lua许多典型操作都可以编码为一条指令.
 ** 如对一个局部变量进行自增运算, `a = a + 1`可编码成`ADD x x y`, 其中x表示局部变量`a`所在寄存器, `y`表示常数1.
 ** 当`a`, `b`同为局部变量时,如 赋值语句`a=b.f`可编码为一条指令`GETTABLE x y z`, 其中`x`表示`a`所在寄存器, `y`为`b`所在寄存器, `z`为字符串常量"f"的索引
@@ -168,17 +170,17 @@ enum OpMode {iABC, iABx, iAsBx};  /* basic instruction format */
 ** 指令布局
 
  0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
-+-----------+--------------------+-----------------------+--------------------------+
-|           |                    |                       |                          |
-|    OP     |         A          |           B           |            C             |
-|           |                    |                       |                          |
-+-----------+--------------------+-----------------------+--------------------------+
++-----------+--------------------+-------------------------+------------------------+
+|           |                    |                         |                        |
+|   OP:6    |        A:8         |           C:9           |          B:9           |
+|           |                    |                         |                        |
++-----------+--------------------+-------------------------+------------------------+
 |           |                    |                                                  |
-|    OP     |         A          |                        Bx                        |
+|   OP:6    |        A:8         |                      Bx:18                       |
 |           |                    |                                                  |
 +-----------+--------------------+--------------------------------------------------+
 |           |                    |                                                  |
-|    OP     |         A          |                       sBx                        |
+|   OP:6    |        A:8         |                      sBx:18                      |
 |           |                    |                                                  |
 +-----------+--------------------+--------------------------------------------------+
  */
@@ -187,60 +189,84 @@ typedef enum {
 /*----------------------------------------------------------------------
 name		args	description
 ------------------------------------------------------------------------*/
-OP_MOVE,/*	A B	R(A) := R(B)					*/
-OP_LOADK,/*	A Bx	R(A) := Kst(Bx)					*/
-OP_LOADBOOL,/*	A B C	R(A) := (Bool)B; if (C) pc++			*/
-OP_LOADNIL,/*	A B	R(A) := ... := R(B) := nil			*/
-OP_GETUPVAL,/*	A B	R(A) := UpValue[B]				*/
+OP_MOVE,/*	A B	R(A) := R(B)					*/										/* 将寄存器B赋给寄存器A */
+OP_LOADK,/*	A Bx	R(A) := Kst(Bx)					*/								/* 将常量Bx载入寄存器A */
+OP_LOADBOOL,/*	A B C	R(A) := (Bool)B; if (C) pc++			*/	/* 将布尔值B载入寄存器A */
+OP_LOADNIL,/*	A B	R(A) := ... := R(B) := nil			*/				/* 将nil赋给一系列寄存器 */
+OP_GETUPVAL,/*	A B	R(A) := UpValue[B]				*/						/* 读取upvalue b, 写入寄存器A */
 
-OP_GETGLOBAL,/*	A Bx	R(A) := Gbl[Kst(Bx)]				*/
-OP_GETTABLE,/*	A B C	R(A) := R(B)[RK(C)]				*/
+OP_GETGLOBAL,/*	A Bx	R(A) := Gbl[Kst(Bx)]				*/				/* 读取全局变量Bx, 写入寄存器A */
+OP_GETTABLE,/*	A B C	R(A) := R(B)[RK(C)]				*/					/* 读取表B元素C, 写入寄存器A */
 
-OP_SETGLOBAL,/*	A Bx	Gbl[Kst(Bx)] := R(A)				*/
-OP_SETUPVAL,/*	A B	UpValue[B] := R(A)				*/
-OP_SETTABLE,/*	A B C	R(A)[RK(B)] := RK(C)				*/
+OP_SETGLOBAL,/*	A Bx	Gbl[Kst(Bx)] := R(A)				*/				/* 读取寄存器A, 写入全局变量Bx */
+OP_SETUPVAL,/*	A B	UpValue[B] := R(A)				*/						/* 读取寄存器A, 写入upvalue B*/
+OP_SETTABLE,/*	A B C	R(A)[RK(B)] := RK(C)				*/				/* 读取寄存器C, 写入表A元素B */
 
-OP_NEWTABLE,/*	A B C	R(A) := {} (size = B,C)				*/
+OP_NEWTABLE,/*	A B C	R(A) := {} (size = B,C)				*/			/* 创建表 */
 
-OP_SELF,/*	A B C	R(A+1) := R(B); R(A) := R(B)[RK(C)]		*/
+OP_SELF,/*	A B C	R(A+1) := R(B); R(A) := R(B)[RK(C)]		*/	/* 为方法调用准备 */
 
-OP_ADD,/*	A B C	R(A) := RK(B) + RK(C)				*/
-OP_SUB,/*	A B C	R(A) := RK(B) - RK(C)				*/
-OP_MUL,/*	A B C	R(A) := RK(B) * RK(C)				*/
-OP_DIV,/*	A B C	R(A) := RK(B) / RK(C)				*/
-OP_MOD,/*	A B C	R(A) := RK(B) % RK(C)				*/
-OP_POW,/*	A B C	R(A) := RK(B) ^ RK(C)				*/
-OP_UNM,/*	A B	R(A) := -R(B)					*/
-OP_NOT,/*	A B	R(A) := not R(B)				*/
-OP_LEN,/*	A B	R(A) := length of R(B)				*/
+OP_ADD,/*	A B C	R(A) := RK(B) + RK(C)				*/							/* 加法操作 */
+OP_SUB,/*	A B C	R(A) := RK(B) - RK(C)				*/							/* 减法操作 */
+OP_MUL,/*	A B C	R(A) := RK(B) * RK(C)				*/							/* 乘法操作 */
+OP_DIV,/*	A B C	R(A) := RK(B) / RK(C)				*/							/* 除法操作 */
+OP_MOD,/*	A B C	R(A) := RK(B) % RK(C)				*/							/* 取模(余数)操作 */
+OP_POW,/*	A B C	R(A) := RK(B) ^ RK(C)				*/							/* 取幂操作 */
+OP_UNM,/*	A B	R(A) := -R(B)					*/											/* 取负操作 */
+OP_NOT,/*	A B	R(A) := not R(B)				*/										/* 逻辑非操作 */
+OP_LEN,/*	A B	R(A) := length of R(B)				*/							/* 取表长操作 */
+OP_CONCAT,/*	A B C	R(A) := R(B).. ... ..R(C)			*/				/* 字符串连接操作 */
 
-OP_CONCAT,/*	A B C	R(A) := R(B).. ... ..R(C)			*/
+OP_JMP,/*	sBx	pc+=sBx					*/														/* 无条件跳转 */
 
-OP_JMP,/*	sBx	pc+=sBx					*/
+OP_EQ,/*	A B C	if ((RK(B) == RK(C)) ~= A) then pc++		*/	/* 相等条件测试 */
+OP_LT,/*	A B C	if ((RK(B) <  RK(C)) ~= A) then pc++  		*//* 小于条件测试 */
+OP_LE,/*	A B C	if ((RK(B) <= RK(C)) ~= A) then pc++  		*//* 小于等于条件测试 */
 
-OP_EQ,/*	A B C	if ((RK(B) == RK(C)) ~= A) then pc++		*/
-OP_LT,/*	A B C	if ((RK(B) <  RK(C)) ~= A) then pc++  		*/
-OP_LE,/*	A B C	if ((RK(B) <= RK(C)) ~= A) then pc++  		*/
+OP_TEST,/*	A C	if not (R(A) <=> C) then pc++			*/ 				/* 布尔测试, 带条件跳转 */
+OP_TESTSET,/*	A B C	if (R(B) <=> C) then R(A) := R(B) else pc++	*/ /* 布尔测试, 带条件跳转和赋值 */
 
-OP_TEST,/*	A C	if not (R(A) <=> C) then pc++			*/ 
-OP_TESTSET,/*	A B C	if (R(B) <=> C) then R(A) := R(B) else pc++	*/ 
+OP_CALL,/*	A B C	R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1)) */ /* 闭包(函数)调用 */
+OP_TAILCALL,/*	A B C	return R(A)(R(A+1), ... ,R(A+B-1))		*/ /* 尾调用 */
+OP_RETURN,/*	A B	return R(A), ... ,R(A+B-2)	(see note)	*/		/* 函数调用返回 */
+/*
+数字型for循环的初始值, 终止值, 步长分别存放在R(A), R(A + 1), R(A + 2)中, 循环变量i则存放在R(A + 3)中
+对于循环语句
 
-OP_CALL,/*	A B C	R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1)) */
-OP_TAILCALL,/*	A B C	return R(A)(R(A+1), ... ,R(A+B-1))		*/
-OP_RETURN,/*	A B	return R(A), ... ,R(A+B-2)	(see note)	*/
+for i = 1, 10, 1 do
+   print(i)
+end
 
+可以展开为
+// OP_FORPREP指令部分
+	_index = _index - _step;	// R(A)-=R(A+2);
+	jmp for_prep;							// pc+=sBx
+
+// 循环体
+loop:
+	print(i);
+
+// OP_FORLOOP指令部分
+for_prep:
+  _index = _index + _step;	// R(A)+=R(A+2);
+if (_index < _limit) {			// if R(A) less than R(A+1) then {
+  jmp loop;									// pc+=sBx;
+  i = _index;								// R(A+3)=R(A)
+}
+
+ */
 OP_FORLOOP,/*	A sBx	R(A)+=R(A+2);
-			if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }*/
-OP_FORPREP,/*	A sBx	R(A)-=R(A+2); pc+=sBx				*/
+			if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }*/				/* 数字型 for 循环 */
+OP_FORPREP,/*	A sBx	R(A)-=R(A+2); pc+=sBx				*/							/* 初始化数字型 for循环 */
 
 OP_TFORLOOP,/*	A C	R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2)); 
-                        if R(A+3) ~= nil then R(A+2)=R(A+3) else pc++	*/ 
-OP_SETLIST,/*	A B C	R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B	*/
+                        if R(A+3) ~= nil then R(A+2)=R(A+3) else pc++	*/ /* 泛型 for 循环 */
+OP_SETLIST,/*	A B C	R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B	*/	/* 设置表一系列数组元素 */
 
-OP_CLOSE,/*	A 	close all variables in the stack up to (>=) R(A)*/
-OP_CLOSURE,/*	A Bx	R(A) := closure(KPROTO[Bx], R(A), ... ,R(A+n))	*/
+OP_CLOSE,/*	A 	close all variables in the stack up to (>=) R(A)*/			/* 关闭用作 upvalue 的一系列局部变量 */
+OP_CLOSURE,/*	A Bx	R(A) := closure(KPROTO[Bx], R(A), ... ,R(A+n))	*/ /* 创建一函数原型的闭包 */
 
-OP_VARARG/*	A B	R(A), R(A+1), ..., R(A+B-1) = vararg		*/
+OP_VARARG/*	A B	R(A), R(A+1), ..., R(A+B-1) = vararg		*/				/* 将可变数量参数赋给寄存器 */
 } OpCode;
 
 
@@ -277,6 +303,14 @@ OP_VARARG/*	A B	R(A), R(A+1), ..., R(A+B-1) = vararg		*/
 ** bit 6: instruction set register A
 ** bit 7: operator is a test
 */  
+/*
+** 指令位掩码. 格式为
+** 0-1位: op mode
+** bits 2-3: C arg mode
+** bits 4-5: B arg mode
+** bit 6: instruction set register A
+** 第7位: 表示是否测试指令
+*/
 
 enum OpArgMask {
   OpArgN,  /* argument is not used */
@@ -302,3 +336,27 @@ LUAI_DATA const char *const luaP_opnames[NUM_OPCODES+1];  /* opcode names */
 
 
 #endif
+/*
+>a=6
+; function [0] definition (level 1)
+; 0 upvalues, 0 params, 2 stacks
+.function  0 0 2 2
+.const  "a"  ; 常量索引0
+.const  6  ; 常量索引1
+[1] loadk      0   1        ; 将数值6(常量索引1)载入0号寄存器
+[2] setglobal  0   0        ; 将数值6(0号寄存器)赋给常量"a"(常量索引0)为键的表元素
+[3] return     0   1				 ; 系统总是添加多余的return
+; end of function
+ */
+/* 局部变量驻留在栈中,它们在生存期内占用 1 个栈(或寄存器)位置. 作用域通过起始程序计数器( pc)位置和截止程序计数器位置指定 */
+/*
+>local a="hello"
+; function [0] definition (level 1)
+; 0 upvalues, 0 params, 2 stacks
+.function  0 0 2 2
+.local  "a"  ; 局部变量索引0
+.const  "hello"  ; 常量索引0
+[1] loadk      0   0        ; 将常量"hello"(常量索引0)载入局部变量"a"(局部变量索引0)
+[2] return     0   1
+; end of function
+ */

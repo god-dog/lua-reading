@@ -55,7 +55,12 @@ const char *const luaP_opnames[NUM_OPCODES+1] = {
   NULL
 };
 
-
+/*
+** T: 是否为逻辑测试指令
+** A: 是否会对R(A)赋值
+** B/C: B/C参数格式
+** mode: opcode格式
+ */
 #define opmode(t,a,b,c,m) (((t)<<7) | ((a)<<6) | ((b)<<4) | ((c)<<2) | (m))
 
 const lu_byte luaP_opmodes[NUM_OPCODES] = {
