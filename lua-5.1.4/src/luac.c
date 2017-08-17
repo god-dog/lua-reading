@@ -162,8 +162,8 @@ static int writer(lua_State* L, const void* p, size_t size, void* u)
 }
 
 struct Smain {
- int argc;
- char** argv;
+ int argc;   /* 命令行参数个数 */
+ char** argv;/* 命令行参数数组 */
 };
 
 static int pmain(lua_State* L)
