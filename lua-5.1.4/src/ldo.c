@@ -296,18 +296,18 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
       base = adjust_varargs(L, p, nargs);
       func = restorestack(L, funcr);  /* previous call may change the stack */
     }
-    /* 创建一个新的CallInfo结构, 保存当前函数调用的相关信息:top, base, func */
+    /* 创建一个新的CallInfo结构, 设置当前函数调用的基础信息:top, base, func. */
     ci = inc_ci(L);  /* now `enter' new function */
     ci->func = func;
     L->base = ci->base = base;
     ci->top = L->base + p->maxstacksize;
     lua_assert(ci->top <= L->stack_last);
-    L->savedpc = p->code;  /* starting point */
+    L->savedpc = p->code;  /* 指令入口. @see luaV_execute() `pc = L->savedpc;` */ /* starting point */
     ci->tailcalls = 0;
     ci->nresults = nresults;
-    for (st = L->top; st < ci->top; st++)
+    for (st = L->top; st < ci->top; st++)   /* 多余的函数形参(实参个数小于形参个数)置为nil */
       setnilvalue(st);
-    L->top = ci->top;
+    L->top = ci->top;                       /* 此时 `l->base == ci->base`, `L->top == ci->top` */
     if (L->hookmask & LUA_MASKCALL) {
       L->savedpc++;  /* hooks assume 'pc' is already incremented */
       luaD_callhook(L, LUA_HOOKCALL, -1);
@@ -352,7 +352,7 @@ static StkId callrethooks (lua_State *L, StkId firstResult) {
 
 
 /*
-** 执行函数返回部分. 函数调用 = luaD_precall + luaD_poscall
+** 执行函数返回部分, 恢复上一个函数调用环境. 函数调用 = luaD_precall + luaD_poscall
  */
 int luaD_poscall (lua_State *L, StkId firstResult) {
   StkId res;
@@ -363,7 +363,7 @@ int luaD_poscall (lua_State *L, StkId firstResult) {
   ci = L->ci--;
   res = ci->func;  /* res == final position of 1st result */
   wanted = ci->nresults;
-  L->base = (ci - 1)->base;  /* restore base */
+  L->base = (ci - 1)->base;  /* 恢复上一个函数 */ /* restore base */
   L->savedpc = (ci - 1)->savedpc;  /* restore savedpc */
   /* move results to correct place */
   for (i = wanted; i != 0 && firstResult < L->top; i--)
@@ -380,7 +380,10 @@ int luaD_poscall (lua_State *L, StkId firstResult) {
 ** The arguments are on the stack, right after the function.
 ** When returns, all the results are on the stack, starting at the original
 ** function position.
-*/ 
+*/
+/*
+** 调用C/Lua函数
+ */
 void luaD_call (lua_State *L, StkId func, int nResults) {
   if (++L->nCcalls >= LUAI_MAXCCALLS) {
     if (L->nCcalls == LUAI_MAXCCALLS)
@@ -515,12 +518,13 @@ static void f_parser (lua_State *L, void *ud) {
   /* 通过数据头标识判断数据格式, 如果为二进制, 调用`luaU_undump`读取预编译的chunk; 如果为文本, 调用`luaY_parser`解析lua代码*/
   tf = ((c == LUA_SIGNATURE[0]) ? luaU_undump : luaY_parser)(L, p->z,
                                                              &p->buff, p->name);
+  /* 将Proto封装成Closure */
   cl = luaF_newLclosure(L, tf->nups, hvalue(gt(L)));
   cl->l.p = tf;
   for (i = 0; i < tf->nups; i++)  /* initialize eventual upvalues */
     cl->l.upvals[i] = luaF_newupval(L);
 
-  /*把luaY_parser分析好的Proto打包进Closure, 再压入堆栈 */
+  /* `cl`入栈位于栈顶, 以便`lua_pcall`取出执行 */
   setclvalue(L, L->top, cl);
   incr_top(L);
 }

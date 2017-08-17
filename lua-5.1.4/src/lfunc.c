@@ -112,6 +112,9 @@ void luaF_close (lua_State *L, StkId level) {
 }
 
 
+/*
+** 创建原型对象
+ */
 Proto *luaF_newproto (lua_State *L) {
   Proto *f = luaM_new(L, Proto);
   luaC_link(L, obj2gco(f), LUA_TPROTO);
