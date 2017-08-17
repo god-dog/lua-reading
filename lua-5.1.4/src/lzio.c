@@ -4,7 +4,9 @@
 ** See Copyright Notice in lua.h
 */
 
-
+/*
+** 通用输入流接口
+ */
 #include <string.h>
 
 #define lzio_c
