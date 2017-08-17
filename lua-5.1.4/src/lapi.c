@@ -934,6 +934,9 @@ LUA_API void lua_call (lua_State *L, int nargs, int nresults) {
 /*
 ** Execute a protected call.
 */
+/*
+** 保护模式调用
+ */
 struct CallS {  /* data to `f_call' */
   StkId func;
   int nresults;
@@ -961,7 +964,7 @@ LUA_API int lua_pcall (lua_State *L, int nargs, int nresults, int errfunc) {
     api_checkvalidindex(L, o);
     func = savestack(L, o);
   }
-  c.func = L->top - (nargs+1);  /* function to be called */
+  c.func = L->top - (nargs+1);  /* 函数地址 */ /* function to be called */
   c.nresults = nresults;
   status = luaD_pcall(L, f_call, &c, savestack(L, c.func), func);
   adjustresults(L, nresults);
