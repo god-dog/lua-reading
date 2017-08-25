@@ -992,7 +992,7 @@ static void block (LexState *ls) {
 */
 struct LHS_assign {
   struct LHS_assign *prev;
-  expdesc v;    /* 变量(全局变量, 局部变量, upvalue, 或者索引变量*/ */ /* variable (global, local, upvalue, or indexed) */
+  expdesc v;    /* 变量(全局变量, 局部变量, upvalue, 或者索引变量*/ /* variable (global, local, upvalue, or indexed) */
 };
 
 

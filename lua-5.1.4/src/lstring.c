@@ -65,7 +65,7 @@ static TString *newlstr (lua_State *L, const char *str, size_t l,
   ts->tsv.reserved = 0;
   /* 将 `str` 复制至 `ts` 末尾*/
   memcpy(ts+1, str, l*sizeof(char));
-  ((char *)(ts+1))[l] = '\0'; /* 字符串部分位于 `ts + 1 ~ ts +l`, 为C API交互方便, 按照C语言风格末尾追加'\0' /* ending 0 */
+  ((char *)(ts+1))[l] = '\0'; /* 字符串部分位于 `ts + 1 ~ ts +l`, 为C API交互方便, 按照C语言风格末尾追加'\0'*/ /* ending 0 */
   tb = &G(L)->strt;
   /* 计算位置, 对号入座, 前插至拉链的开头. 桶所在位置为字符串散列值关于桶个数的模. */
   h = lmod(h, tb->size);
