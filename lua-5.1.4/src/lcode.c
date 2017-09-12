@@ -484,6 +484,9 @@ int luaK_exp2RK (FuncState *fs, expdesc *e) {
 }
 
 
+/*
+** 根据变量和值的信息(两个expdesc)生成相关代码
+ */
 void luaK_storevar (FuncState *fs, expdesc *var, expdesc *ex) {
   switch (var->k) {
     case VLOCAL: {

@@ -481,6 +481,10 @@ LUA_API void lua_pushinteger (lua_State *L, lua_Integer n) {
 }
 
 
+/*
+** 把长度为`len`的字符串`s`压栈.
+** Lua 对这个字符串做一次内存拷贝, `s`指向的内存在函数返回后, 可以释放或另作它用. 字符串内可包含'\0'
+ */
 LUA_API void lua_pushlstring (lua_State *L, const char *s, size_t len) {
   lua_lock(L);
   luaC_checkGC(L);
@@ -950,6 +954,16 @@ static void f_call (lua_State *L, void *ud) {
 
 
 
+/*
+** 以保护模式调用函数. 行为同 `lua_call`, 总能自动弹出函数本身及其参数
+** @param nargs 输入参数个数
+** @param nresults 返回值个数
+** @param errfunc 错误处理函数的栈索引. 传入0即表示不设置错误处理函数
+** @return 成功时返回0.
+  LUA_ERRRUN: 运行时错误
+  LUA_ERRMEM: 内存分配错误. 这种错误lua无法触发错误处理函数
+  LUA_ERRERR: 运行错误处理函数时发生错误
+ */
 LUA_API int lua_pcall (lua_State *L, int nargs, int nresults, int errfunc) {
   struct CallS c;
   int status;
